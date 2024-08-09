@@ -1,0 +1,12 @@
+go 1.20
+
+use (
+	.
+	./../components/common
+	./../components/discover
+	./../components/database
+	./../components/log
+	./../components/parser
+	./../components/sdks
+	./../components/broker
+)

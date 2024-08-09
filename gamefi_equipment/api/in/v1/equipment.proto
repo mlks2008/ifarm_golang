@@ -1,0 +1,139 @@
+syntax = "proto3";
+
+package api.in.v1;
+
+import "google/api/annotations.proto";
+import "api/in/v1/vo/equipment.proto";
+import "protoc-gen-openapiv2/options/annotations.proto";
+
+option go_package = "gamefi_equipment/api/in/v1;v1";
+
+service EquipmentService {
+	option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_tag) = {
+		description: "装备系统"
+	};
+
+	// 添加装备(掉落装备)
+	rpc AddEquipment (AddEquipmentRequest) returns (AddEquipmentResponse){
+		option (google.api.http) = {
+			post: "/v1/in/user/equipment-add"
+			body: "*"
+		};
+		option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+			summary: "添加装备(掉落装备)";
+			//external_docs: {
+			//	url: "#";
+			//	description: "添加装备";
+			//}
+		};
+	}
+	// 强化装备
+	rpc UpgradeEquipment (UpgradeEquipmentRequest) returns (UpgradeEquipmentResponse){
+		option (google.api.http) = {
+			post: "/v1/in/user/equipment-upgrade"
+			body: "*"
+		};
+		option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+			summary: "强化装备";
+		};
+	}
+	// 穿装备
+	rpc AddFightEquipment (AddFightEquipmentRequest) returns (AddFightEquipmentResponse){
+		option (google.api.http) = {
+			post: "/v1/in/user/equipment-addfight"
+			body: "*"
+		};
+		option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+			summary: "穿装备";
+		};
+	}
+	// 脱装备
+	rpc ClearFightEquipment (ClearFightEquipmentRequest) returns (ClearFightEquipmentResponse){
+		option (google.api.http) = {
+			post: "/v1/in/user/equipment-clearfight"
+			body: "*"
+		};
+		option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+			summary: "脱装备";
+		};
+	}
+	// 装备列表
+	rpc ListEquipment (ListEquipmentRequest) returns (ListEquipmentResponse){
+		option (google.api.http) = {
+			post: "/v1/in/user/equipment-list"
+			body: "*"
+		};
+		option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+			summary: "装备列表";
+		};
+	}
+	// 英雄总属性
+	rpc ListHeroEquipment (ListHeroEquipmentRequest) returns (ListHeroEquipmentResponse){
+		option (google.api.http) = {
+			post: "/v1/in/user/equipment-heroequipment-list"
+			body: "*"
+		};
+		option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+			summary: "英雄总属性";
+		};
+	}
+	// 批量获取英雄总属性
+	rpc BatchHeroEquipment (BatchHeroEquipmentRequest) returns (BatchHeroEquipmentResponse){
+		option (google.api.http) = {
+			post: "/v1/in/user/equipment-heroequipment-batch"
+			body: "*"
+		};
+		option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+			summary: "批量获取英雄总属性";
+		};
+	}
+
+	// 分解装备
+	rpc BreakDownEquipment (BreakDownEquipmentRequest) returns (BreakDownEquipmentResponse){
+		option (google.api.http) = {
+			post: "/v1/in/user/equipment-breakdown"
+			body: "*"
+		};
+		option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+			summary: "分解装备";
+		};
+	}
+//	// 洗炼装备
+//	rpc RefineEquipment (RefineEquipmentRequest) returns (RefineEquipmentResponse){
+//		option (google.api.http) = {
+//			post: "/v1/in/user/equipment-refine"
+//			body: "*"
+//		};
+//	}
+
+//	// 转入装备
+//	rpc TransferInEquipment (TransferInEquipmentRequest) returns (TransferInEquipmentResponse){
+//		option (google.api.http) = {
+//			post: "/v1/in/user/equipment-transferin"
+//			body: "*"
+//		};
+//	}
+//	// 转出装备
+//	rpc TransferOutEquipment (TransferOutEquipmentRequest) returns (TransferOutEquipmentResponse){
+//		option (google.api.http) = {
+//			post: "/v1/in/user/equipment-transferout"
+//			body: "*"
+//		};
+//	}
+//	// 锁定装备
+//	rpc LockEquipment (LockEquipmentRequest) returns (LockEquipmentResponse){
+//		option (google.api.http) = {
+//			post: "/v1/in/user/equipment-lock"
+//			body: "*"
+//		};
+//	}
+//	// 解锁装备
+//	rpc UnLockEquipment (UnLockEquipmentRequest) returns (UnLockEquipmentResponse){
+//		option (google.api.http) = {
+//			post: "/v1/in/user/equipment-unlock"
+//			body: "*"
+//		};
+//	}
+
+}
+

@@ -1,0 +1,76 @@
+plats:
+  binance:
+    open: true
+    apiaddr: "https://api.binance.com"
+    access_key:
+    secret_key:
+  kucoin:
+    open: true
+    apiaddr: "https://api.kucoin.com"
+    access_key: 73becb1a90dbd3a001fed588
+    secret_key: 468b4913-7d12-4aa7-9f94-2dba30a0c4a8
+    passphrase: dev_tst_H2qjcJFn
+BNB/FDUSD:
+  firstbuyamount: 3500 #usdt
+  buytimes1:
+    buyPoint: 0.9
+    profitTargetPoint: 0.6
+  buytimes2:
+    buyPoint: 1.65
+    profitTargetPoint:  0.6
+  buytimes3:
+    buyPoint: 3.2
+    profitTargetPoint:  0.6
+  buytimes4:
+    buyPoint: 6.0
+    profitTargetPoint:  0.6
+  buytimes5:
+    buyPoint: 10.0
+    profitTargetPoint:  0.8
+  buytimes6:
+    buyPoint: 13.5
+    profitTargetPoint:  0.8
+  buytimes7:
+    buyPoint: 18.0
+    profitTargetPoint:  1.5
+  buytimes8:
+    buyPoint: 25.0
+    profitTargetPoint:  1.5
+  buytimes9:
+    buyPoint: 30.0
+    profitTargetPoint:  2.0
+  default:
+    buyPoint: 35.0
+    profitTargetPoint:  2.5
+ARB/USDT:
+  firstbuyamount: 500 #usdt
+  buytimes1:
+    buyPoint: 0.8
+    profitTargetPoint: 1.5
+  buytimes2:
+    buyPoint: 1.5
+    profitTargetPoint:  1.0
+  buytimes3:
+    buyPoint: 3.2
+    profitTargetPoint:  1.0
+  buytimes4:
+    buyPoint: 7.0
+    profitTargetPoint:  1.0
+  buytimes5:
+    buyPoint: 14.0
+    profitTargetPoint:  1.5
+  buytimes6:
+    buyPoint: 18.0
+    profitTargetPoint:  1.5
+  buytimes7:
+    buyPoint: 25.0
+    profitTargetPoint:  2.0
+  buytimes8:
+    buyPoint: 30.0
+    profitTargetPoint:  2.5
+  buytimes9:
+    buyPoint: 35.0
+    profitTargetPoint:  3.0
+  default:
+    buyPoint: 40.0
+    profitTargetPoint:  5.0

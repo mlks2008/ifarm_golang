@@ -1,0 +1,76 @@
+syntax = "proto3";
+
+package components.sdks.gts_shop.pb;
+
+import "google/api/annotations.proto";
+
+import "sdks/gts_shop/pb/vo/gts_shop.proto";
+
+option go_package = "components/sdks/gts_shop/pb;pb";
+
+service GtsShop {
+	// 鉴权登录
+	rpc AuthCode (AuthorizationCodeRequest) returns (GetAccountResponse){
+		option (google.api.http) = {
+			post: "/backend/token_user/token_user_info"
+			body: "*",
+		};
+	};
+	// 发送验证码
+	rpc SendVerificationCode (SendVerificationCodeRequest) returns (SendVerificationCodeResponse) {
+		option (google.api.http) = {
+			post: "/backend/token_user/{userId}/send_verification_message"
+			body: "*"
+		};
+	}
+	// 验证验证码
+	rpc VerifyCode (VerifyCodeRequest) returns (VerifyCodeResponse) {
+		option (google.api.http) = {
+			post: "/backend/token_user/check_qr_code"
+			body: "*"
+		};
+	}
+
+	// 获取用户信息
+	rpc UserProfile (UserProfileRequest) returns (GetAccountResponse) {
+		option (google.api.http) = {
+			get: "/backend/token_user/token_user_info/{tokenUserId}"
+		};
+	}
+
+	// 账户列表
+	rpc ListAsset (ListAssetRequest) returns (ListAssetResponse) {
+		option (google.api.http) = {
+			get: "/backend/user_gp/wallet/query/{realUserId}"
+		};
+	}
+
+	// 增加资产
+	rpc AddAsset (AddAssetRequest) returns (AddAssetResponse) {
+		option (google.api.http) = {
+			post: "/backend/user_gp/increase"
+			body: "*"
+		};
+	}
+	// 冻结资产
+	rpc FreezeAsset (FreezeAssetRequest) returns (FreezeAssetResponse) {
+		option (google.api.http) = {
+			post: "/backend/user_gp/holding"
+			body: "*"
+		};
+	}
+	// 扣除资产
+	rpc SubAsset (SubAssetRequest) returns (SubAssetResponse) {
+		option (google.api.http) = {
+			post: "/backend/user_gp/confirm_holding"
+			body: "*"
+		};
+	}
+	// 解冻资产
+	rpc ReturnAsset (ReturnAssetRequest) returns (ReturnAssetResponse) {
+		option (google.api.http) = {
+			post: "/backend/user_gp/return_holding"
+			body: "*"
+		};
+	}
+}

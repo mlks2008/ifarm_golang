@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package components.sdks.gamefi_account.pb;
+
+import "google/api/annotations.proto";
+
+import "sdks/gamefi_account/pb/vo/gamefi_account.proto";
+
+option go_package = "components/sdks/gamefi_account/pb;pb";
+
+service GamefiAccount {
+	// 发送邮件
+	rpc SendEmail (SendEmailRequest) returns (SendEmailResponse) {
+		option (google.api.http) = {
+			post: "/account/common/email/send"
+			body: "*"
+		};
+	}
+}

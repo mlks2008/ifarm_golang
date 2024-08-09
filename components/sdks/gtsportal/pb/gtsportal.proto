@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package sdks.gtsportal.pb;
+
+import "google/api/annotations.proto";
+
+option go_package = "sdks/gtsportal/pb;pb";
+option java_multiple_files = true;
+option java_package = "sdks.gtsportal.pb";
+
+service GtsPortal {
+	rpc GetToken (GetTokenRequest) returns (GetTokenReply){
+		option (google.api.http) = {
+			post: "v1/user/profile"
+			body: "*",
+		};
+	}
+}
+
+message GetTokenRequest {}
+message GetTokenReply {}

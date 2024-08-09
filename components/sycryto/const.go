@@ -1,0 +1,6 @@
+package sycryto
+
+const CIPHER_KEY = "11363bb2370656b92515a22dd613005704"     //bf
+const CIPHER_KEY_O = "221812dc10537d38b188109d48e1a64131"   //O
+const CIPHER_KEY_OLD = "53292adc10537d38b188109d48e1a641b4" //old,korea
+const CIPHER_KEY_NEW = "3846d51d927a434c4a479c0ee3e813ca49" //new

@@ -1,0 +1,94 @@
+syntax = "proto3";
+package kratos.api;
+
+option go_package = "gamefi_equipment/internal/conf;conf";
+
+import "google/protobuf/duration.proto";
+
+message Bootstrap {
+  Nacos nacos = 1;
+  Server server = 2;
+  Data data = 3;
+  Kafka kafka = 4;
+  Client client = 5;
+  Log log = 6;
+  Sys sys = 7;
+}
+
+message Nacos {
+  string group = 1;
+  string ip = 2;
+  int64 port = 3;
+  string userName = 4;
+  string pwd = 5;
+  string namespaceId = 6;
+  int64 timeoutMs = 7;
+}
+
+message Server {
+  message HTTP {
+    string network = 1;
+    string addr = 2;
+    google.protobuf.Duration timeout = 3;
+  }
+  message GRPC {
+    string network = 1;
+    string addr = 2;
+    google.protobuf.Duration timeout = 3;
+  }
+  HTTP http = 1;
+  GRPC grpc = 2;
+}
+
+message Data {
+  message Postgres {
+    string source = 1;
+    bool   debug = 2;
+    int32 pool_size = 3;
+    google.protobuf.Duration read_timeout = 4;
+    google.protobuf.Duration write_timeout = 5;
+    google.protobuf.Duration idle_timeout = 6;
+    int32 idle = 7;
+  }
+  message Redis {
+    string addr = 1;
+    string auth = 2;
+    google.protobuf.Duration dial_timeout = 3;
+    google.protobuf.Duration read_timeout = 4;
+    google.protobuf.Duration write_timeout = 5;
+    int32 active = 6;
+    int32 idle = 7;
+    google.protobuf.Duration idle_timeout = 8;
+    google.protobuf.Duration slow_log = 9;
+  }
+  Postgres postgres = 1;
+  Redis redis = 2;
+}
+
+message Kafka {
+  message KafkaConfig {
+    string topic = 1;
+    string addr = 2;
+  }
+  KafkaConfig logevent = 1;
+}
+
+message Client {
+  message Http {
+    string endpoint = 1;
+    google.protobuf.Duration timeout = 2;
+  }
+  Http gts_shop = 1;
+  Http platform_dust = 2;
+  Http gamefi_account = 3;
+}
+
+message Log {
+  string name = 1;
+  string dir = 2;
+  bool debug = 3;
+}
+
+message Sys {
+  string config_path = 1;
+}

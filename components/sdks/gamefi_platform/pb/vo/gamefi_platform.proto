@@ -1,0 +1,114 @@
+syntax = "proto3";
+
+package components.sdks.gamefi_platform.pb;
+
+option go_package = "components/sdks/gamefi_platform/pb/vo;vo";
+
+message DustAddAssetRequest {
+  string userId = 1;
+  string action = 2;
+  string num = 3;
+  string referenceId = 4;
+}
+message DustAddAssetResponse {
+  int64 code = 1;
+  string message = 2;
+  Data data = 3;
+  message Data {
+    float dustNum = 1;
+    int64 userId = 2;
+  }
+}
+message DustFreezeAssetRequest {
+  string userId = 1;
+  string action = 2;
+  string num = 3;
+  string referenceId = 4;
+}
+message DustFreezeAssetResponse {
+  int64 code = 1;
+  string message = 2;
+  Data data = 3;
+  message Data {
+    float dustNum = 1;
+    int64 userId = 2;
+  }
+}
+message DustSubAssetRequest {
+  string userId = 1;
+  string referenceId = 2;
+}
+message DustSubAssetResponse {
+  int64 code = 1;
+  string message = 2;
+  bool data = 3;
+}
+message DustReturnAssetRequest {
+  string userId = 1;
+  string referenceId = 2;
+}
+message DustReturnAssetResponse {
+  int64 code = 1;
+  string message = 2;
+  Data data = 3;
+  message Data {
+    int64 userId = 1;
+  }
+}
+
+message AddHeroRequest {
+  string userId = 1;
+  string referenceId = 2;
+  repeated Data data = 3;
+  message Data {
+    string heroId = 1;
+    string transferCode = 2;
+  }
+}
+message AddHeroResponse {
+  int64 code = 1;
+  string message = 2;
+  bool data = 3;
+}
+message FreezeHeroRequest {
+  string userId = 1;
+  string referenceId = 2;
+  repeated string userHeroIds = 3;
+}
+message FreezeHeroResponse {
+  int64 code = 1;
+  string message = 2;
+  bool data = 3;
+}
+message SubHeroRequest {
+  string userId = 1;
+  string referenceId = 2;
+}
+message SubHeroResponse {
+  int64 code = 1;
+  string message = 2;
+  bool data = 3;
+}
+message ReturnHeroRequest {
+  string userId = 1;
+  string referenceId = 2;
+}
+message ReturnHeroResponse {
+  int64 code = 1;
+  string message = 2;
+  bool data = 3;
+}
+message GetUserHeroRequest {
+  string id = 1;
+}
+message GetUserHeroResponse {
+  int64 code = 1;
+  string message = 2;
+  Data data = 3;
+  message Data {
+    int64 heroId = 1;
+    int64 userId = 2;
+    int32 quality = 3;
+    int32 star = 4;
+  }
+}

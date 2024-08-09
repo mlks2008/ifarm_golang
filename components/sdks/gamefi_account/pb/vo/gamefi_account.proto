@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package components.sdks.gamefi_account.pb;
+
+option go_package = "components/sdks/gamefi_account/pb/vo;vo";
+
+message SendEmailRequest{
+  string email = 1;
+  string tid = 2;
+  string subject = 3;
+  string content = 4;
+}
+message SendEmailResponse{
+  int64 code = 1;
+  string message = 2;
+  bool data = 3;
+}

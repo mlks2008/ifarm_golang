@@ -1,0 +1,76 @@
+syntax = "proto3";
+
+package components.sdks.gamefi_platform.pb;
+
+import "google/api/annotations.proto";
+
+import "sdks/gamefi_platform/pb/vo/gamefi_platform.proto";
+
+option go_package = "components/sdks/gamefi_platform/pb;pb";
+
+
+service PlatformDust {
+	// 增加资产
+	rpc AddAsset (DustAddAssetRequest) returns (DustAddAssetResponse) {
+		option (google.api.http) = {
+			post: "/user/galaxy_dust/increase"
+			body: "*"
+		};
+	}
+	// 冻结资产
+	rpc FreezeAsset (DustFreezeAssetRequest) returns (DustFreezeAssetResponse) {
+		option (google.api.http) = {
+			post: "/user/galaxy_dust/holding"
+			body: "*"
+		};
+	}
+	// 扣除资产
+	rpc SubAsset (DustSubAssetRequest) returns (DustSubAssetResponse) {
+		option (google.api.http) = {
+			post: "/user/galaxy_dust/confirm"
+			body: "*"
+		};
+	}
+	// 解冻资产
+	rpc ReturnAsset (DustReturnAssetRequest) returns (DustReturnAssetResponse) {
+		option (google.api.http) = {
+			post: "/user/galaxy_dust/return"
+			body: "*"
+		};
+	}
+
+	// 增加Hero
+	rpc AddHero (AddHeroRequest) returns (AddHeroResponse) {
+		option (google.api.http) = {
+			post: "/hero/user/transfer/in"
+			body: "*"
+		};
+	}
+	// 冻结Hero
+	rpc FreezeHero (FreezeHeroRequest) returns (FreezeHeroResponse) {
+		option (google.api.http) = {
+			post: "/hero/user/lock"
+			body: "*"
+		};
+	}
+	// 扣除Hero
+	rpc SubHero (SubHeroRequest) returns (SubHeroResponse) {
+		option (google.api.http) = {
+			post: "/hero/user/transfer/out"
+			body: "*"
+		};
+	}
+	// 解冻Hero
+	rpc ReturnHero (ReturnHeroRequest) returns (ReturnHeroResponse) {
+		option (google.api.http) = {
+			post: "/hero/user/unlock"
+			body: "*"
+		};
+	}
+	// 查询用户Hero
+	rpc GetUserHero (GetUserHeroRequest) returns (GetUserHeroResponse) {
+		option (google.api.http) = {
+			get: "/hero/user/{id}"
+		};
+	}
+}

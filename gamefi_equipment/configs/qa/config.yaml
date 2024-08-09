@@ -1,0 +1,51 @@
+nacos:
+  group: gamefi
+  ip: 10.40.10.10
+  port: 30848
+  userName: "nacos"
+  pwd: "wa2aohxgUnlFa0bn"
+  namespaceId: 49af7b41-7291-4eef-86fe-71b8c1ca7a14
+  timeoutMs: 5000
+log:
+  name: gamefi_equipment
+  dir:
+  debug: true
+server:
+  http:
+    addr: 0.0.0.0:8010
+    timeout: 60s
+  grpc:
+    addr: 0.0.0.0:8011
+    timeout: 60s
+data:
+  postgres:
+    source: postgresql://gametacus_user:123456@10.40.10.3:5432/gamefi_platform?sslmode=disable
+    debug: true
+    pool_size: 20
+    read_timeout: 5s
+    write_timeout: 5s
+    idle: 10
+    idle_timeout: 10s
+  redis:
+    addr: 10.40.10.15:6379
+    auth: game123456
+    dial_timeout: 1s
+    read_timeout: 1s
+    write_timeout: 1s
+    active: 20
+    idle: 10
+    idle_timeout: 10s
+    slow_log: 1s
+kafka:
+  logevent:
+    topic: qa_equipment_log_event
+    addr: 10.40.10.2:9092
+client:
+  platform_dust:
+    endpoint: http://10.40.10.10:30005
+    timeout: 10s
+  gamefi_account:
+    endpoint: http://10.40.10.10:30006
+    timeout: 10s
+sys:
+  config_path: /app/gamefi_config

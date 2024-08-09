@@ -1,0 +1,1 @@
+[{"whiteMainNum":1,"whiteVicNum":0,"blueMainNum":1,"blueVicNum":1,"purpleMainNum":2,"purpleVicNum":1,"orangeMainNum":3,"orangeVicNum":1,"redMainNum":4,"redVicNum":1}]

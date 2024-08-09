@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package api;
+
+option go_package = "gamefi_equipment/api;api";
+
+enum Error {
+  xx = 0;
+  UNKNOWN = 999;//未知
+
+  //sdk类
+  SDK_UNKNOWN = 1000;//sdk未知
+  SDK_Api_Failed = 1001;//center接口报错
+  SDK_Hero_Id_Not_Exist = 1002;//英雄不存在
+
+  //数据库
+  DB_UNKNOWN = 2001;//db未知
+  DB_User_Not_Found = 2002;//用户不存在
+  Redis_UNKNOWN = 2100;//redis未知
+
+  //公共业务
+  G_Args_DataInvalid = 3001;//请求参数值有误
+  G_User_Not_Match = 3002;//与用户不匹配
+  G_Resource_Not_Exist = 3003;//资源不存在
+  G_Resource_Value_Invalid = 3004;
+  G_Invalid_Operation = 3005;//无效操作
+
+  //业务
+  S_UNKNOWN = 5001; //类型未知
+  S_Id_Not_Exist = 5002;//Id不存在
+  S_Position_Not_Match = 5003;//位置不匹配
+  S_Legend_Not_Match = 5004;//专属英雄不匹配
+  S_Quality_Not_Meet_Condition = 5005; //品质不满足条件
+  S_Star_Not_Meet_Condition = 5006; //星级不满足条件
+  S_Have_Equipped = 5007;//已经装备过
+  S_Quality_Not_Exist = 5008;//品质不存在
+  S_Equipment_Upgrade_End = 5009;//装备升级已到顶
+  S_Equipment_Upgrade_Err = 5010;//装备升级错误
+  S_Equipment_Upgrade_Attr_Not_Exist = 5011; //属性不存在
+}

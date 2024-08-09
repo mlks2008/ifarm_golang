@@ -1,0 +1,195 @@
+syntax = "proto3";
+
+package api.in.v1;
+
+option go_package = "gamefi_equipment/api/in/v1/vo;vo";
+
+enum EquipmentStatus {
+  None = 0;
+  Normal = 1; //未使用
+  Equipped = 2; //已穿戴
+  Locked = 3;   //已锁定
+  Withdrawn = 4; //已提现
+  BreakDown = 5; //已分解
+}
+
+message HeroEquipment{
+  int64 userHeroId = 1;
+  repeated EquipmentInfo equipments = 2;
+  repeated Attr totalAttr = 3;
+}
+message EquipmentInfo{
+  int64 id = 1;
+  int64 baseId = 2;
+  int64 userId = 3;
+  int64 heroId = 4;
+  int64 userHeroId = 5;
+  int32 level = 6;
+  int32 star = 7;
+  EquipmentStatus status = 8;
+  repeated Attr initAttrs = 9;// 初始属性
+  repeated Attr upgradeAttrs = 10;// 强化属性
+  int32 position = 11;
+}
+message Attr {
+  string attr = 1;
+  int64 value = 2;
+}
+
+message AddEquipmentRequest {
+  int64 baseId = 1;
+  int64 userId = 2;
+}
+message AddEquipmentResponse {
+  int32 code = 1; // 0: 正常返回值, 其他的值为错误码
+  string message = 2;
+  Data data = 3;
+  message Data {
+    bool success = 1; // 通知结果
+  }
+}
+message UpgradeEquipmentRequest {
+  int64 id = 1;
+}
+message UpgradeEquipmentResponse {
+  int32 code = 1; // 0: 正常返回值, 其他的值为错误码
+  string message = 2;
+  Data data = 3;
+  message Data {
+    int64 id = 1;
+    int32 level = 2;
+    bool success = 3; // 升级结果
+    repeated Attr addValues = 4; //增加值
+  }
+}
+message AddFightEquipmentRequest {
+  int64 id = 1;
+  int32 position = 2;
+  int64 userHeroId = 3;
+}
+message AddFightEquipmentResponse {
+  int32 code = 1; // 0: 正常返回值, 其他的值为错误码
+  string message = 2;
+  Data data = 3;
+  message Data {
+    bool success = 1; // 通知结果
+  }
+}
+message ClearFightEquipmentRequest {
+  int64 id = 1;
+}
+message ClearFightEquipmentResponse {
+  int32 code = 1; // 0: 正常返回值, 其他的值为错误码
+  string message = 2;
+  Data data = 3;
+  message Data {
+    bool success = 1; // 通知结果
+  }
+}
+message ListEquipmentRequest {
+  int64 userId = 1;
+}
+message ListEquipmentResponse {
+  int32 code = 1; // 0: 正常返回值, 其他的值为错误码
+  string message = 2;
+  Data data = 3;
+  message Data {
+    repeated EquipmentInfo equipments = 1;
+  }
+}
+message ListHeroEquipmentRequest {
+  int64 userHeroId = 1;
+  int64 gameId = 2;   // 游戏id
+  string universe = 3;// 宇宙类型
+}
+message ListHeroEquipmentResponse {
+  int32 code = 1; // 0: 正常返回值, 其他的值为错误码
+  string message = 2;
+  Data data = 3;
+  message Data {
+    HeroEquipment heroEquipment = 1;
+  }
+}
+message BatchHeroEquipmentRequest {
+  repeated int64 userHeroId = 1;
+  int64 gameId = 2;   // 游戏id
+  string universe = 3;// 宇宙类型
+}
+message BatchHeroEquipmentResponse {
+  int32 code = 1; // 0: 正常返回值, 其他的值为错误码
+  string message = 2;
+  Data data = 3;
+  message Data {
+    repeated HeroEquipment batchHeroEquipments = 1;
+  }
+}
+
+
+message BreakDownEquipmentRequest {
+  int64 id = 1;
+}
+message BreakDownEquipmentResponse {
+  int32 code = 1; // 0: 正常返回值, 其他的值为错误码
+  string message = 2;
+  Data data = 3;
+  message Data {
+    bool success = 1; // 分解结果
+  }
+}
+//message RefineEquipmentRequest {
+//}
+//message RefineEquipmentResponse {
+//}
+
+//message TransferInEquipmentRequest {
+//  string userId = 1;
+//  string referenceId = 2;
+//  repeated int64 id = 3;
+//}
+//message TransferInEquipmentResponse {
+//  int32 code = 1; // 0: 正常返回值, 其他的值为错误码
+//  string message = 2; // 响应消息
+//  Data data = 3; // 返回结构体
+//  message Data {
+//    bool success = 1; // 通知结果
+//  }
+//}
+//message TransferOutEquipmentRequest {
+//  string userId = 1;
+//  string referenceId = 2;
+//  repeated int64 id = 3;
+//}
+//message TransferOutEquipmentResponse {
+//  int32 code = 1; // 0: 正常返回值, 其他的值为错误码
+//  string message = 2; // 响应消息
+//  Data data = 3; // 返回结构体
+//  message Data {
+//    bool success = 1; // 通知结果
+//  }
+//}
+//message LockEquipmentRequest {
+//  string userId = 1;
+//  string referenceId = 2;
+//  repeated int64 id = 3;
+//}
+//message LockEquipmentResponse {
+//  int32 code = 1; // 0: 正常返回值, 其他的值为错误码
+//  string message = 2; // 响应消息
+//  Data data = 3; // 返回结构体
+//  message Data {
+//    bool success = 1; // 通知结果
+//  }
+//}
+//message UnLockEquipmentRequest {
+//  string userId = 1;
+//  string referenceId = 2;
+//  repeated int64 id = 3;
+//}
+//message UnLockEquipmentResponse {
+//  int32 code = 1; // 0: 正常返回值, 其他的值为错误码
+//  string message = 2; // 响应消息
+//  Data data = 3; // 返回结构体
+//  message Data {
+//    bool success = 1; // 通知结果
+//  }
+//}

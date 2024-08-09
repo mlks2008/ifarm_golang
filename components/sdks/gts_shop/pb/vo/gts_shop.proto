@@ -1,0 +1,128 @@
+syntax = "proto3";
+
+package components.sdks.gts_shop.pb;
+
+option go_package = "components/sdks/gts_shop/pb/vo;vo";
+
+message AuthorizationCodeRequest {
+  string code = 1;
+}
+
+//email和phone
+message SendVerificationCodeRequest {
+  string userId = 1;
+}
+message SendVerificationCodeResponse {
+  int64 code = 1;
+  string message = 2;
+  Data data = 3;
+  message Data {
+    string type = 1; //mail or phone
+    string code = 2;
+  }
+}
+message VerifyCodeRequest {
+  string userId = 1; // 用户ID
+  string googleCode = 2; // 验证码
+}
+message VerifyCodeResponse {
+  int64 code = 1;
+  string message = 2;
+  bool data = 3;
+}
+
+message UserProfileRequest {
+  string tokenUserId = 1;
+}
+message GetAccountResponse {
+  int64 code = 1;
+  string message = 2;
+  Data data = 3;
+  message Data {
+    string realUserId = 1;
+    string tokenUserId = 2;
+    string nickName = 3;
+    string avatar = 4;
+    bool bindEmail = 5;
+    bool bindPhone = 6;
+    bool bindGA = 7;
+  }
+}
+
+message ListAssetRequest {
+  string realUserId = 1;
+}
+message ListAssetResponse {
+  int64 code = 1;
+  string message = 2;
+  Data data = 3;
+  message Data {
+    UserGalaxyDust  userGalaxyDust = 1;
+    UserGp  userGp = 2;
+    message UserGalaxyDust{
+        float dustNum = 1;
+        int64 userId = 2;
+    }
+    message UserGp{
+      float gpValue = 1;
+      int64 userId = 2;
+    }
+  }
+}
+
+message AddAssetRequest {
+  string userId = 1;
+  string action = 2;
+  string num = 3;
+  string referenceId = 4;
+}
+message AddAssetResponse {
+  int64 code = 1;
+  string message = 2;
+  Data data = 3;
+  message Data {
+    int64 userId = 1;
+  }
+}
+message FreezeAssetRequest {
+  string userId = 1;
+  string action = 2;
+  string num = 3;
+  string referenceId = 4;
+}
+message FreezeAssetResponse {
+  int64 code = 1;
+  string message = 2;
+  Data data = 3;
+  message Data {
+    int64 userId = 1;
+  }
+}
+message SubAssetRequest {
+  string userId = 1;
+  string action = 2;
+  string num = 3;
+  string referenceId = 4;
+}
+message SubAssetResponse {
+  int64 code = 1;
+  string message = 2;
+  Data data = 3;
+  message Data {
+    int64 userId = 1;
+  }
+}
+message ReturnAssetRequest {
+  string userId = 1;
+  string action = 2;
+  string num = 3;
+  string referenceId = 4;
+}
+message ReturnAssetResponse {
+  int64 code = 1;
+  string message = 2;
+  Data data = 3;
+  message Data {
+    int64 userId = 1;
+  }
+}

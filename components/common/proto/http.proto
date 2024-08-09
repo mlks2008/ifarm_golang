@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package game;
+
+option go_package = "components/common/proto;proto";
+option java_multiple_files = true;
+option java_package = "proto";
+
+enum Code {
+  OK = 0;
+}
+//自定义错误体,用于global.http.EncoderError函数
+message ErrorWithDetails {
+  int32 code = 1;
+  string message = 2;
+}

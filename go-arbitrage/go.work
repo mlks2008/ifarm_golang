@@ -1,0 +1,9 @@
+go 1.20
+
+use (
+	.
+	./../components/log
+	./../components/message
+	./../components/database
+	./../components/myconfig
+)
