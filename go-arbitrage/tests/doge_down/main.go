@@ -16,13 +16,13 @@ import (
 
 var (
 	symbol           = "DOGEFDUSD"
-	baseIncrease     = 1.277  //Safety order大小倍数
-	baseQty          = 300.0  //Safety order size
-	priceIncrease    = 1.0015 //每笔订单间隔比例(from init price)
-	priceFactor      = 1.12   //Safety order间隔倍数
+	baseIncrease     = 1.79   //Safety order大小倍数
+	baseQty          = 5000.0 //Safety order size
+	priceIncrease    = 1.01   //每笔订单间隔比例(from init price)
+	priceFactor      = 1.3    //Safety order间隔倍数
 	profitFactor     = 0.0035 //Target profit
-	maxSellOrders    = 31     //最大订单数
-	actionSellOrders = 5      //活跃订单数
+	maxSellOrders    = 10     //最大订单数
+	actionSellOrders = 2      //活跃订单数
 	apiKey           = "mCXfycRaEiffizOajnB1VsVxytyUFnaA1tK4eX8QyuM8G565Weq5s4QXoyhkzwdE"
 	secretKey        = "wvRdYxo9O4IeBywbDCZgGhflwDwv2ERUbdQHUgoZ8JXTpUDGvFsTnXtzQOHxL9XW"
 	initSellQty      = make([]decimal.Decimal, maxSellOrders)
@@ -62,12 +62,11 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	cancelOrders("all", openOrders)
+	cancelOrders(binance.SideTypeSell, openOrders)
+	//重置每轮时间，重新挂单
+	RunSetEachRoundTime(symbol, time.Now().Unix())
 
 	go checkFinish()
-
-	//24小时重置一次init cost
-	//go updateInitCost()
 
 	for {
 		if checkFee() {
@@ -384,22 +383,36 @@ func checkFinish() {
 
 				continue
 			} else {
-				//运行中卖单长时间没有成交，取消卖单重新铺
-				if buyOrderId > 0 && placeSellLastTime > 0 && time.Now().Unix()-placeSellLastTime > 20*60 {
+				////运行中卖单长时间没有成交
+				//if buyOrderId > 0 && placeSellLastTime > 0 && time.Now().Unix()-placeSellLastTime > 30*60 {
+				//	stop = true
+				//	cancelOrders(binance.SideTypeSell, openOrders)
+				//	initSellOrders(false)
+				//	placeSellLastTime = time.Now().Unix()
+				//	stop = false
+				//}
+			}
+		} else {
+			//本轮长时间没成交
+			if buyOrderId == 0 && placeSellLastTime > 0 && time.Now().Unix()-placeSellLastTime > 60*60 {
+				curPrice, err := getCurrentPrice()
+				if err != nil {
+					log.Logger.Error("[placeSells] Error getCurrentPrice:", err)
+					continue
+				}
+				initPrice, err := RunGetInitPrice(symbol)
+				if err != nil {
+					log.Logger.Error(err)
+					continue
+				}
+				//当前价格小于当时铺单价格，说明是下跌导致的未成交需要重新铺单(如果当前价格比当时铺单价格还高仍未成交，说明价格太稳定不需要重新铺单）
+				if curPrice < initPrice {
 					stop = true
 					cancelOrders(binance.SideTypeSell, openOrders)
-					initSellOrders(false)
+					initSellOrders(true)
 					placeSellLastTime = time.Now().Unix()
 					stop = false
 				}
-			}
-		} else {
-			if buyOrderId == 0 && placeSellLastTime > 0 && time.Now().Unix()-placeSellLastTime > 5*60 { //本轮长时间没成交
-				stop = true
-				cancelOrders(binance.SideTypeSell, openOrders)
-				initSellOrders(true)
-				placeSellLastTime = time.Now().Unix()
-				stop = false
 			}
 		}
 	}
