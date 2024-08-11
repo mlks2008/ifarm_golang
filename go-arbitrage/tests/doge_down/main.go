@@ -15,20 +15,20 @@ import (
 )
 
 var (
-	symbol             = "DOGEFDUSD"
-	baseIncrease       = 1.05   //Safety order大小倍数
-	baseQty            = 1100.0 //Safety order size
-	firstPriceIncrease = 1.002  //第一手比率要小点，避免长时间无法卖出
-	priceIncrease      = 1.002  //每笔订单间隔比例(from init price)
-	priceFactor        = 1.0011 //Safety order间隔倍数
-	profitFactor       = 0.004  //Target profit
-	maxSellOrders      = 60     //最大订单数
-	actionSellOrders   = 5      //活跃订单数
-	apiKey             = "mCXfycRaEiffizOajnB1VsVxytyUFnaA1tK4eX8QyuM8G565Weq5s4QXoyhkzwdE"
-	secretKey          = "wvRdYxo9O4IeBywbDCZgGhflwDwv2ERUbdQHUgoZ8JXTpUDGvFsTnXtzQOHxL9XW"
-	initSellQty        = make([]decimal.Decimal, maxSellOrders)
-	initSellPrice      = make([]decimal.Decimal, maxSellOrders)
-	baseDoubleIndex    = 5 //前几手可以补单，之后不补单，否则很快占用大量资金
+	symbol           = "DOGEFDUSD"
+	baseIncrease     = 1.277  //Safety order大小倍数
+	baseQty          = 300.0  //Safety order size
+	priceIncrease    = 1.0015 //每笔订单间隔比例(from init price)
+	priceFactor      = 1.12   //Safety order间隔倍数
+	profitFactor     = 0.0035 //Target profit
+	maxSellOrders    = 31     //最大订单数
+	actionSellOrders = 5      //活跃订单数
+	apiKey           = "mCXfycRaEiffizOajnB1VsVxytyUFnaA1tK4eX8QyuM8G565Weq5s4QXoyhkzwdE"
+	secretKey        = "wvRdYxo9O4IeBywbDCZgGhflwDwv2ERUbdQHUgoZ8JXTpUDGvFsTnXtzQOHxL9XW"
+	initSellQty      = make([]decimal.Decimal, maxSellOrders)
+	initSellPrice    = make([]decimal.Decimal, maxSellOrders)
+	initRadios       = make([]decimal.Decimal, maxSellOrders)
+	baseDoubleIndex  = 0 //前几手可以补单，之后不补单，否则很快占用大量资金
 )
 
 var client *binance.Client
@@ -50,6 +50,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	//return
 
 	initialUSDT, initialDOGE, _ := RunGetDogeCost(symbol)
 	log.Logger.Debugf("Initial balances: %s DOGE, %s FDUSD", initialDOGE.String(), initialUSDT.String())
@@ -121,11 +122,11 @@ func initSellOrders(init bool) error {
 		initSellQty[i] = qty
 
 		if i == 0 {
-			sellPrice := decimal.NewFromFloat(price * math.Pow(firstPriceIncrease, float64(i+1))).Truncate(5)
-			initSellPrice[i] = sellPrice
+			initRadios[0] = decimal.NewFromFloat(priceIncrease - 1)
+			initSellPrice[0] = decimal.NewFromFloat(price * math.Pow(priceIncrease, 1)).Truncate(5)
 		} else {
-			sellPrice := decimal.NewFromFloat(price * math.Pow(priceIncrease, float64(i+1)) * priceFactor).Truncate(5)
-			initSellPrice[i] = sellPrice
+			initRadios[i] = (decimal.NewFromFloat(priceIncrease - 1)).Add(initRadios[i-1].Mul(decimal.NewFromFloat(priceFactor)))
+			initSellPrice[i] = initRadios[i].Add(decimal.NewFromInt(1)).Mul(decimal.NewFromFloat(price)).Truncate(5)
 		}
 	}
 
