@@ -15,19 +15,24 @@ import (
 )
 
 var (
-	symbol           = "DOGEFDUSD"
-	baseIncrease     = 1.814  //Safety order大小倍数
-	baseQty          = 4500.0 //Safety order size
-	priceIncrease    = 1.0105 //每笔订单间隔比例(from init price)
-	priceFactor      = 1.3    //Safety order间隔倍数
-	profitFactor     = 0.0035 //Target profit
-	maxSellOrders    = 10     //最大订单数
-	actionSellOrders = 2      //活跃订单数
+	symbol             = "DOGEFDUSD"
+	firstQty           = 9000.0 //首笔挂单量
+	firstPriceIncrease = 1.004  //首笔价格增长比例
+
+	baseQty      = 4500.0 //Safety order size
+	baseIncrease = 1.814  //Safety order大小倍数
+
+	priceIncrease = 1.0064 //每笔订单间隔比例(from init price)
+	priceFactor   = 1.404  //Safety order间隔倍数
+	profitFactor  = 0.0035 //Target profit
+
+	maxSellOrders    = 10 //最大订单数
+	actionSellOrders = 2  //活跃订单数
 	apiKey           = "mCXfycRaEiffizOajnB1VsVxytyUFnaA1tK4eX8QyuM8G565Weq5s4QXoyhkzwdE"
 	secretKey        = "wvRdYxo9O4IeBywbDCZgGhflwDwv2ERUbdQHUgoZ8JXTpUDGvFsTnXtzQOHxL9XW"
-	initSellQty      = make([]decimal.Decimal, maxSellOrders)
-	initSellPrice    = make([]decimal.Decimal, maxSellOrders)
-	initRadios       = make([]decimal.Decimal, maxSellOrders)
+	initSellQty      = make([]decimal.Decimal, maxSellOrders+1)
+	initSellPrice    = make([]decimal.Decimal, maxSellOrders+1)
+	initRadios       = make([]decimal.Decimal, maxSellOrders+1)
 	baseDoubleIndex  = 0 //前几手可以补单，之后不补单，否则很快占用大量资金
 )
 
@@ -42,7 +47,7 @@ var placeSellLastTime int64 //最近一次挂卖单时间，定时检测，如�
 var startTime = time.Now().Unix()
 
 func main() {
-	log.InitLogger("../logs", "testDoge", true)
+	log.InitLogger("./", "testDoge", true)
 
 	client = binance.NewClient(apiKey, secretKey)
 
@@ -62,7 +67,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	cancelOrders(binance.SideTypeSell, openOrders)
+	cancelOrders("all", openOrders)
 	//重置每轮时间，重新挂单
 	RunSetEachRoundTime(symbol, time.Now().Unix())
 
@@ -116,16 +121,19 @@ func initSellOrders(init bool) error {
 
 	log.Logger.Debugf("[initSellOrders] Current price: %f", price)
 
+	initSellQty[0] = decimal.NewFromFloat(firstQty).Truncate(0)
+	initRadios[0] = decimal.NewFromFloat(firstPriceIncrease - 1)
+	initSellPrice[0] = decimal.NewFromFloat(price * math.Pow(firstPriceIncrease, 1)).Truncate(5)
 	for i := 0; i < maxSellOrders; i++ {
 		qty := decimal.NewFromFloat(baseQty * math.Pow(baseIncrease, float64(i))).Truncate(0)
-		initSellQty[i] = qty
+		initSellQty[i+1] = qty
 
 		if i == 0 {
-			initRadios[0] = decimal.NewFromFloat(priceIncrease - 1)
-			initSellPrice[0] = decimal.NewFromFloat(price * math.Pow(priceIncrease, 1)).Truncate(5)
+			initRadios[i+1] = decimal.NewFromFloat(priceIncrease - 1)
+			initSellPrice[i+1] = decimal.NewFromFloat(price * math.Pow(priceIncrease, 1)).Truncate(5)
 		} else {
-			initRadios[i] = (decimal.NewFromFloat(priceIncrease - 1)).Add(initRadios[i-1].Mul(decimal.NewFromFloat(priceFactor)))
-			initSellPrice[i] = initRadios[i].Add(decimal.NewFromInt(1)).Mul(decimal.NewFromFloat(price)).Truncate(5)
+			initRadios[i+1] = (decimal.NewFromFloat(priceIncrease - 1)).Add(initRadios[i].Mul(decimal.NewFromFloat(priceFactor)))
+			initSellPrice[i+1] = initRadios[i+1].Add(decimal.NewFromInt(1)).Mul(decimal.NewFromFloat(price)).Truncate(5)
 		}
 	}
 
@@ -394,7 +402,7 @@ func checkFinish() {
 			}
 		} else {
 			//本轮长时间没成交
-			if buyOrderId == 0 && placeSellLastTime > 0 && time.Now().Unix()-placeSellLastTime > 60*60 {
+			if buyOrderId == 0 && placeSellLastTime > 0 && time.Now().Unix()-placeSellLastTime > 10*60 {
 				curPrice, err := getCurrentPrice()
 				if err != nil {
 					log.Logger.Error("[placeSells] Error getCurrentPrice:", err)
@@ -419,6 +427,9 @@ func checkFinish() {
 }
 
 func dogeBalanceSaveFile(initTime int64, currentUSDT, currentDOGE string) {
+	//todo usdt始终按0算
+	currentUSDT = "0"
+
 	//保存当前余额
 	log.Logger.Debugf("[checkFinish] Initial balances: %s DOGE, %s FDUSD", currentDOGE, currentUSDT)
 	RunSetDogeCost(symbol, currentUSDT, currentDOGE)
