@@ -62,7 +62,7 @@ func main() {
 	//初始投入值
 	RunGetDogeCost(symbol + "-INIT")
 
-	//重启时取消所有卖单
+	//重启时取消所有挂单
 	openOrders, err := openOrders()
 	if err != nil {
 		panic(err)
@@ -75,9 +75,9 @@ func main() {
 
 	for {
 		if checkFee() {
-			haveNewSell, openSells, openBuys := placeSells()
+			haveNewSell, openSells, openBuys, minSellPrice := placeSells()
 			time.Sleep(time.Second * 10)
-			placeBuy(haveNewSell, openSells, openBuys)
+			placeBuy(haveNewSell, openSells, openBuys, minSellPrice)
 			time.Sleep(time.Second * 60)
 		}
 	}
@@ -156,25 +156,31 @@ func initSellOrders(init bool) error {
 
 // 挂卖
 // 否：如果有成交卖单，定时会把成交卖单在补上 --> 容易占用大量资金，一直上涨亏损过大
-func placeSells() (bool, int, int) {
+func placeSells() (bool, int, int, decimal.Decimal) {
 	if stop == true {
-		return false, -1, -1
+		return false, -1, -1, decimal.Zero
 	}
 
 	openOrders, err := openOrders()
 	if err != nil {
 		log.Logger.Error("[placeSells] Error openOrders:", err)
-		return false, -1, -1
+		return false, -1, -1, decimal.Zero
 	}
 	//统计卖挂单数
 	var openSells int
 	var openBuys int
+	var minSellPrice decimal.Decimal
 	for _, order := range openOrders {
+		var price, _ = decimal.NewFromString(order.Price)
 		if order.Side == binance.SideTypeSell {
 			openSells++
 		}
 		if order.Side == binance.SideTypeBuy {
 			openBuys++
+		}
+		//当前挂单中最小的卖单价
+		if order.Side == binance.SideTypeSell && (minSellPrice == decimal.Zero || price.Cmp(minSellPrice) < 0) {
+			minSellPrice = price
 		}
 	}
 
@@ -186,7 +192,7 @@ func placeSells() (bool, int, int) {
 		curPrice, err := getCurrentPrice()
 		if err != nil {
 			log.Logger.Error("[placeSells] Error getCurrentPrice:", err)
-			return false, openSells, openBuys
+			return false, openSells, openBuys, minSellPrice
 		}
 
 		for i, sellPrice := range initSellPrice {
@@ -207,7 +213,7 @@ func placeSells() (bool, int, int) {
 						val, err := redis.GetString(key)
 						if err != nil {
 							log.Logger.Error(err)
-							return false, openSells, openBuys
+							return false, openSells, openBuys, minSellPrice
 						}
 						//不存在进行补单和前几手可以重复挂单
 						if val == "" || i < baseDoubleIndex {
@@ -217,6 +223,10 @@ func placeSells() (bool, int, int) {
 							placeSellLastTime = time.Now().Unix()
 							if _, err := placeOrder("SELL", initSellQty[i].String(), sellPrice.String()); err == nil {
 								redis.SetEX(key, "1", 7*24*3600*time.Second)
+								//当前挂单中最小的卖单价
+								if sellPrice.Cmp(minSellPrice) < 0 {
+									minSellPrice = sellPrice
+								}
 							}
 						}
 					}
@@ -230,10 +240,10 @@ func placeSells() (bool, int, int) {
 	if timeout >= 1 {
 		message.SendDingTalkRobit(true, "oneplat", "doge2_every_sell_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/(3600*2)), fmt.Sprintf("超过%v小时没有新卖单", timeout*2))
 	}
-	return haveNewSell, openSells, openBuys
+	return haveNewSell, openSells, openBuys, minSellPrice
 }
 
-func placeBuy(haveNewSell bool, openSells, openBuys int) {
+func placeBuy(haveNewSell bool, openSells, openBuys int, minSellPrice decimal.Decimal) {
 	if stop == true {
 		return
 	}
@@ -253,9 +263,6 @@ func placeBuy(haveNewSell bool, openSells, openBuys int) {
 		}
 	}
 
-	//启始资金
-	_, firstInitialDOGE, _ := RunGetDogeCost(symbol + "-INIT")
-
 	runInitialUSDT, runInitialDOGE, _ := RunGetDogeCost(symbol)
 	log.Logger.Debugf("[placeBuy] Initial balances: %s DOGE, %s FDUSD", runInitialDOGE.String(), runInitialUSDT.String())
 
@@ -266,8 +273,24 @@ func placeBuy(haveNewSell bool, openSells, openBuys int) {
 	}
 	log.Logger.Debugf("[placeBuy] current balances: %s DOGE, %s FDUSD", currentDOGE.String(), currentUSDT.String())
 
+	//计算本轮所有卖单获得U与当前U余额比较，取小值作为本次的购买本金
+	var calcUsdtDelta = func(usdtBalance decimal.Decimal, minSellPrice decimal.Decimal) (float64, bool) {
+		var total decimal.Decimal
+		for i, sellPrice := range initSellPrice {
+			if sellPrice.Cmp(minSellPrice) < 0 {
+				total = total.Add(sellPrice.Mul(initSellQty[i]))
+			}
+		}
+		if total.Cmp(usdtBalance) > 0 {
+			return usdtBalance.Float64()
+		} else {
+			return total.Float64()
+		}
+	}
+
 	dogeDelta, _ := currentDOGE.Sub(runInitialDOGE).Float64()
-	usdtDelta, _ := currentUSDT.Sub(runInitialUSDT).Float64()
+	//usdtDelta, _ := currentUSDT.Sub(runInitialUSDT).Float64()
+	usdtDelta, _ := calcUsdtDelta(currentUSDT, minSellPrice)
 	log.Logger.Debugf("[placeBuy] dogeDelta: %v, usdtDelta: %v buyOrderId: %v", dogeDelta, usdtDelta, buyOrderId)
 	//doge为负，表示已有卖单成交，开始挂买单
 	if dogeDelta < 0 {
@@ -277,6 +300,7 @@ func placeBuy(haveNewSell bool, openSells, openBuys int) {
 		}
 
 		//可能一直上涨没有大的回调，这时需要把之前的收益拿出来，减少本次的买回量(doge),确保可以成交（收益回撤了）
+		_, firstInitialDOGE, _ := RunGetDogeCost(symbol + "-INIT")
 		totalProfitDoge, _ := runInitialDOGE.Sub(firstInitialDOGE).Float64()
 		if buySuccLastTime > 0 && time.Now().Unix()-buySuccLastTime > 24*3600 {
 			dogeDelta = dogeDelta + totalProfitDoge/3
@@ -442,8 +466,8 @@ func checkFinish() {
 }
 
 func dogeBalanceSaveFile(initTime int64, currentUSDT, currentDOGE string) {
-	//todo usdt始终按0算
-	currentUSDT = "0"
+	////todo usdt始终按0算
+	//currentUSDT = "0"
 
 	//保存当前余额
 	log.Logger.Debugf("[checkFinish] Initial balances: %s DOGE, %s FDUSD", currentDOGE, currentUSDT)
