@@ -27,7 +27,7 @@ var (
 	profitFactor  = 0.0035 //Target profit
 
 	maxSellOrders    = 10 //最大订单数
-	actionSellOrders = 2  //活跃订单数
+	actionSellOrders = 3  //活跃订单数
 	apiKey           = "mCXfycRaEiffizOajnB1VsVxytyUFnaA1tK4eX8QyuM8G565Weq5s4QXoyhkzwdE"
 	secretKey        = "wvRdYxo9O4IeBywbDCZgGhflwDwv2ERUbdQHUgoZ8JXTpUDGvFsTnXtzQOHxL9XW"
 	initSellQty      = make([]decimal.Decimal, maxSellOrders+1)
@@ -37,12 +37,12 @@ var (
 )
 
 var client *binance.Client
-var buyOrderId int64      //当前买单orderId
-var buySuccLastTime int64 //最近一次买单成功执行时间，挂买单时，如果发现很久没有下，需要进行回撤处理
-var stop bool             //暂停买卖挂单
-var sellOrders int        //已挂卖单数
+var stop bool      //暂停买卖挂单
+var sellOrders int //已挂卖单数
 
+var buyOrderId int64        //当前买单orderId
 var placeBuyLastTime int64  //最近一次挂买单时间，定时检测，超过没有发生更新买单，重新计算下单
+var buySuccLastTime int64   //最近一次买单成功执行时间，挂买单时，如果发现很久没有成交，需要进行回撤处理
 var placeSellLastTime int64 //最近一次挂卖单时间，定时检测，如果发现很久时没有挂卖了，这时可能在下跌中，重新挂卖单列表
 var startTime = time.Now().Unix()
 
@@ -57,28 +57,35 @@ func main() {
 	}
 	//return
 
+	//加载buyorderid
+	buyOrderId = RunGetBuyOrderId(symbol)
+	placeSellLastTime = time.Now().Unix()
+	log.Logger.Debugf("Load buyOrderId: %v", buyOrderId)
+
 	initialUSDT, initialDOGE, _ := RunGetDogeCost(symbol)
 	log.Logger.Debugf("Initial balances: %s DOGE, %s FDUSD", initialDOGE.String(), initialUSDT.String())
 	//初始投入值
 	RunGetDogeCost(symbol + "-INIT")
 
-	//重启时取消所有挂单
-	openOrders, err := openOrders()
-	if err != nil {
-		panic(err)
-	}
-	cancelOrders("all", openOrders)
-	//重置每轮时间，重新挂单
-	RunSetEachRoundTime(symbol, time.Now().Unix())
+	////重启时取消所有挂单
+	//openOrders, err := openOrders()
+	//if err != nil {
+	//	panic(err)
+	//}
+	//cancelOrders("all", openOrders)
+	////重置每轮时间，重新挂单
+	//RunSetEachRoundTime(symbol, time.Now().Unix())
 
 	go checkFinish()
 
 	for {
 		if checkFee() {
-			haveNewSell, openSells, openBuys, minSellPrice := placeSells()
+			haveNewSell, openSells, openBuys := placeSells()
+			//log.Logger.Debug("placeSells ok")
 			time.Sleep(time.Second * 10)
-			placeBuy(haveNewSell, openSells, openBuys, minSellPrice)
-			time.Sleep(time.Second * 60)
+			placeBuy(haveNewSell, openSells, openBuys)
+			//log.Logger.Debug("placeBuy ok")
+			time.Sleep(time.Second * 10)
 		}
 	}
 }
@@ -156,31 +163,25 @@ func initSellOrders(init bool) error {
 
 // 挂卖
 // 否：如果有成交卖单，定时会把成交卖单在补上 --> 容易占用大量资金，一直上涨亏损过大
-func placeSells() (bool, int, int, decimal.Decimal) {
+func placeSells() (bool, int, int) {
 	if stop == true {
-		return false, -1, -1, decimal.Zero
+		return false, -1, -1
 	}
 
 	openOrders, err := openOrders()
 	if err != nil {
 		log.Logger.Error("[placeSells] Error openOrders:", err)
-		return false, -1, -1, decimal.Zero
+		return false, -1, -1
 	}
 	//统计卖挂单数
 	var openSells int
 	var openBuys int
-	var minSellPrice decimal.Decimal
 	for _, order := range openOrders {
-		var price, _ = decimal.NewFromString(order.Price)
 		if order.Side == binance.SideTypeSell {
 			openSells++
 		}
 		if order.Side == binance.SideTypeBuy {
 			openBuys++
-		}
-		//当前挂单中最小的卖单价
-		if order.Side == binance.SideTypeSell && (minSellPrice == decimal.Zero || price.Cmp(minSellPrice) < 0) {
-			minSellPrice = price
 		}
 	}
 
@@ -192,7 +193,7 @@ func placeSells() (bool, int, int, decimal.Decimal) {
 		curPrice, err := getCurrentPrice()
 		if err != nil {
 			log.Logger.Error("[placeSells] Error getCurrentPrice:", err)
-			return false, openSells, openBuys, minSellPrice
+			return false, openSells, openBuys
 		}
 
 		for i, sellPrice := range initSellPrice {
@@ -213,7 +214,7 @@ func placeSells() (bool, int, int, decimal.Decimal) {
 						val, err := redis.GetString(key)
 						if err != nil {
 							log.Logger.Error(err)
-							return false, openSells, openBuys, minSellPrice
+							return false, openSells, openBuys
 						}
 						//不存在进行补单和前几手可以重复挂单
 						if val == "" || i < baseDoubleIndex {
@@ -223,10 +224,7 @@ func placeSells() (bool, int, int, decimal.Decimal) {
 							placeSellLastTime = time.Now().Unix()
 							if _, err := placeOrder("SELL", initSellQty[i].String(), sellPrice.String()); err == nil {
 								redis.SetEX(key, "1", 7*24*3600*time.Second)
-								//当前挂单中最小的卖单价
-								if sellPrice.Cmp(minSellPrice) < 0 {
-									minSellPrice = sellPrice
-								}
+								//log.Logger.Debugf("sell price key %v", key)
 							}
 						}
 					}
@@ -237,13 +235,13 @@ func placeSells() (bool, int, int, decimal.Decimal) {
 
 	//超时没有成交了
 	var timeout = (time.Now().Unix() - placeSellLastTime) / (3600 * 2)
-	if timeout >= 1 {
+	if placeSellLastTime > 0 && timeout >= 1 {
 		message.SendDingTalkRobit(true, "oneplat", "doge2_every_sell_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/(3600*2)), fmt.Sprintf("超过%v小时没有新卖单", timeout*2))
 	}
-	return haveNewSell, openSells, openBuys, minSellPrice
+	return haveNewSell, openSells, openBuys
 }
 
-func placeBuy(haveNewSell bool, openSells, openBuys int, minSellPrice decimal.Decimal) {
+func placeBuy(haveNewSell bool, openSells, openBuys int) {
 	if stop == true {
 		return
 	}
@@ -258,7 +256,7 @@ func placeBuy(haveNewSell bool, openSells, openBuys int, minSellPrice decimal.De
 			return
 		}
 		//当前没有买单:可能发生了取消买单成功但重新下买单失败，所以这里有个超过n分钟允许重新下单
-		if (openSells > 0 && openBuys == 0) && time.Now().Unix()-placeBuyLastTime < 5*60 {
+		if openSells > 0 && openBuys == 0 && time.Now().Unix()-placeBuyLastTime < 5*60 {
 			return
 		}
 	}
@@ -273,14 +271,38 @@ func placeBuy(haveNewSell bool, openSells, openBuys int, minSellPrice decimal.De
 	}
 	log.Logger.Debugf("[placeBuy] current balances: %s DOGE, %s FDUSD", currentDOGE.String(), currentUSDT.String())
 
+	openOrders, err := openOrders()
+	if err != nil {
+		log.Logger.Error("[placeBuy] Error openOrders:", err)
+		return
+	}
 	//计算本轮所有卖单获得U与当前U余额比较，取小值作为本次的购买本金
-	var calcUsdtDelta = func(usdtBalance decimal.Decimal, minSellPrice decimal.Decimal) (float64, bool) {
+	var calcUsdtDelta = func(dogeDelta float64, usdtBalance decimal.Decimal) (float64, bool) {
+		//还没有卖出
+		if dogeDelta >= 0 {
+			return 0, false
+		}
+
+		//当前挂单中最小的卖单价
+		var minSellPrice = decimal.Zero
+		for _, order := range openOrders {
+			var price, _ = decimal.NewFromString(order.Price)
+			if order.Side == binance.SideTypeSell && (minSellPrice == decimal.Zero || price.Cmp(minSellPrice) < 0) {
+				minSellPrice = price
+			}
+		}
+
 		var total decimal.Decimal
 		for i, sellPrice := range initSellPrice {
+			//fmt.Println(sellPrice, minSellPrice, sellPrice.Cmp(minSellPrice))
 			if sellPrice.Cmp(minSellPrice) < 0 {
 				total = total.Add(sellPrice.Mul(initSellQty[i]))
 			}
 		}
+		log.Logger.Debugf("[placeBuy] calcSell: %s FDUSD, minSellPrice: %v", total.String(), minSellPrice.String())
+
+		//return usdtBalance.Float64()
+		//两者取小
 		if total.Cmp(usdtBalance) > 0 {
 			return usdtBalance.Float64()
 		} else {
@@ -290,13 +312,14 @@ func placeBuy(haveNewSell bool, openSells, openBuys int, minSellPrice decimal.De
 
 	dogeDelta, _ := currentDOGE.Sub(runInitialDOGE).Float64()
 	//usdtDelta, _ := currentUSDT.Sub(runInitialUSDT).Float64()
-	usdtDelta, _ := calcUsdtDelta(currentUSDT, minSellPrice)
+	usdtDelta, _ := calcUsdtDelta(dogeDelta, currentUSDT)
 	log.Logger.Debugf("[placeBuy] dogeDelta: %v, usdtDelta: %v buyOrderId: %v", dogeDelta, usdtDelta, buyOrderId)
 	//doge为负，表示已有卖单成交，开始挂买单
 	if dogeDelta < 0 {
 		if usdtDelta <= 0 {
 			logmsg := "异常:套利还未执行完，U的余额增量居然小于等于0"
 			message.SendDingTalkRobit(true, "oneplat", "doge2_every_profit_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/5*60), logmsg)
+			return
 		}
 
 		//可能一直上涨没有大的回调，这时需要把之前的收益拿出来，减少本次的买回量(doge),确保可以成交（收益回撤了）
@@ -342,6 +365,7 @@ func placeBuy(haveNewSell bool, openSells, openBuys int, minSellPrice decimal.De
 			message.SendDingTalkRobit(true, "oneplat", "doge2_every_buy_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/10*60), err.Error())
 		} else {
 			buyOrderId = orderId
+			RunSetBuyOrderId(symbol, buyOrderId)
 			placeBuyLastTime = time.Now().Unix()
 		}
 	}
@@ -361,7 +385,7 @@ func checkFinish() {
 		if buyOrderId > 0 {
 			orderstatus, qty, err := getOrderStatus(symbol, buyOrderId)
 			if err != nil {
-				log.Logger.Errorf("[checkFinish] getOrderStatus", err)
+				log.Logger.Errorf("[checkFinish] getOrderStatus %v %v", buyOrderId, err)
 				continue
 			}
 			if orderstatus == true {
@@ -426,6 +450,7 @@ func checkFinish() {
 				cancelOrders(binance.SideTypeSell, openOrders)
 				initSellOrders(true)
 				buyOrderId = 0
+				RunSetBuyOrderId(symbol, 0)
 				stop = false
 
 				continue

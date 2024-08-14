@@ -77,7 +77,7 @@ func cancelOrder(orderId int64) error {
 func getOrderStatus(symbol string, orderid int64) (bool, string, error) {
 	order, err := client.NewGetOrderService().Symbol(symbol).OrderID(orderid).Do(context.Background())
 	if err != nil {
-		log.Logger.Error("getOrderStatus", err)
+		//log.Logger.Errorf("getOrderStatus %v %v", orderid, err)
 		return false, "", err
 	}
 	if order.Status == binance.OrderStatusTypeFilled && order.OrigQuantity == order.ExecutedQuantity {
@@ -176,4 +176,19 @@ func RunGetEachRoundTime(symbol string) int64 {
 
 func RunSetEachRoundTime(symbol string, eachRoundTime int64) {
 	utils.UpdateFile(fmt.Sprintf("files/down2_dcaservice.%v.eachroundtime", symbol), fmt.Sprintf("%v", eachRoundTime))
+}
+
+func RunGetBuyOrderId(symbol string) int64 {
+	val := utils.ReadFile(fmt.Sprintf("files/down2_dcaservice.%v.buyorderid", symbol))
+	val = strings.Replace(val, "\n", "", -1)
+	if val == "" || val == "0" {
+		return 0
+	} else {
+		val, _ := strconv.ParseInt(val, 10, 64)
+		return val
+	}
+}
+
+func RunSetBuyOrderId(symbol string, buyorderid int64) {
+	utils.UpdateFile(fmt.Sprintf("files/down2_dcaservice.%v.buyorderid", symbol), fmt.Sprintf("%v", buyorderid))
 }
