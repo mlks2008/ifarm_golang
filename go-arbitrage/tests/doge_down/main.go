@@ -75,9 +75,9 @@ func main() {
 
 	for {
 		if checkFee() {
-			haveNewSell := placeSells()
+			haveNewSell, openSells, openBuys := placeSells()
 			time.Sleep(time.Second * 10)
-			placeBuy(haveNewSell)
+			placeBuy(haveNewSell, openSells, openBuys)
 			time.Sleep(time.Second * 60)
 		}
 	}
@@ -156,21 +156,25 @@ func initSellOrders(init bool) error {
 
 // 挂卖
 // 否：如果有成交卖单，定时会把成交卖单在补上 --> 容易占用大量资金，一直上涨亏损过大
-func placeSells() bool {
+func placeSells() (bool, int, int) {
 	if stop == true {
-		return false
+		return false, -1, -1
 	}
 
 	openOrders, err := openOrders()
 	if err != nil {
 		log.Logger.Error("[placeSells] Error openOrders:", err)
-		return false
+		return false, -1, -1
 	}
 	//统计卖挂单数
 	var openSells int
+	var openBuys int
 	for _, order := range openOrders {
 		if order.Side == binance.SideTypeSell {
 			openSells++
+		}
+		if order.Side == binance.SideTypeBuy {
+			openBuys++
 		}
 	}
 
@@ -182,7 +186,7 @@ func placeSells() bool {
 		curPrice, err := getCurrentPrice()
 		if err != nil {
 			log.Logger.Error("[placeSells] Error getCurrentPrice:", err)
-			return false
+			return false, openSells, openBuys
 		}
 
 		for i, sellPrice := range initSellPrice {
@@ -203,7 +207,7 @@ func placeSells() bool {
 						val, err := redis.GetString(key)
 						if err != nil {
 							log.Logger.Error(err)
-							return false
+							return false, openSells, openBuys
 						}
 						//不存在进行补单和前几手可以重复挂单
 						if val == "" || i < baseDoubleIndex {
@@ -226,16 +230,27 @@ func placeSells() bool {
 	if timeout >= 1 {
 		message.SendDingTalkRobit(true, "oneplat", "doge2_every_sell_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/(3600*2)), fmt.Sprintf("超过%v小时没有新卖单", timeout*2))
 	}
-	return haveNewSell
+	return haveNewSell, openSells, openBuys
 }
 
-func placeBuy(haveNewSell bool) {
+func placeBuy(haveNewSell bool, openSells, openBuys int) {
 	if stop == true {
 		return
 	}
-	//没有产生新卖单，不需要更新买单价格(有时会取消买单成功，但重新下买单失败，所以这里有个超过5分钟允许重新下单)
-	if haveNewSell == false && time.Now().Unix()-placeBuyLastTime < 5*60 {
-		return
+	//没有产生新卖单情况
+	if haveNewSell == false {
+		//placeSells()发生了异常
+		if openSells == -1 && openBuys == -1 {
+			return
+		}
+		//当前有买单:不需要重新挂买单(安全点加个超时吧）
+		if openSells > 0 && openBuys > 0 && time.Now().Unix()-placeBuyLastTime < 60*60 {
+			return
+		}
+		//当前没有买单:可能发生了取消买单成功但重新下买单失败，所以这里有个超过n分钟允许重新下单
+		if (openSells > 0 && openBuys == 0) && time.Now().Unix()-placeBuyLastTime < 5*60 {
+			return
+		}
 	}
 
 	//启始资金
