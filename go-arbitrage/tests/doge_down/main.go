@@ -22,7 +22,7 @@ var (
 	baseQty      = 4500.0 //Safety order size
 	baseIncrease = 1.814  //Safety order大小倍数
 
-	priceIncrease = 1.0064 //每笔订单间隔比例(from init price)
+	priceIncrease = 1.006  //每笔订单间隔比例(from init price)
 	priceFactor   = 1.404  //Safety order间隔倍数
 	profitFactor  = 0.0035 //Target profit
 
@@ -36,9 +36,14 @@ var (
 	baseDoubleIndex  = 0 //前几手可以补单，之后不补单，否则很快占用大量资金
 )
 
+var (
+	Filed_BuyOrderId        string = "buyorderid"
+	Filed_EachRoundTime            = "eachroundtime"
+	Filed_PlaceSellLastTime string = "placeSellLastTime"
+)
+
 var client *binance.Client
-var stop bool      //暂停买卖挂单
-var sellOrders int //已挂卖单数
+var stop bool //暂停买卖挂单
 
 var buyOrderId int64        //当前买单orderId
 var placeBuyLastTime int64  //最近一次挂买单时间，定时检测，超过没有发生更新买单，重新计算下单
@@ -58,9 +63,9 @@ func main() {
 	//return
 
 	//加载buyorderid
-	buyOrderId = RunGetBuyOrderId(symbol)
-	placeSellLastTime = time.Now().Unix()
-	log.Logger.Debugf("Load buyOrderId: %v", buyOrderId)
+	buyOrderId = RunGetInt64(symbol, Filed_BuyOrderId)
+	placeSellLastTime = RunGetInt64(symbol, Filed_PlaceSellLastTime)
+	log.Logger.Debugf("Load buyOrderId: %v, placeSellLastTime: %v", buyOrderId, placeSellLastTime)
 
 	initialUSDT, initialDOGE, _ := RunGetDogeCost(symbol)
 	log.Logger.Debugf("Initial balances: %s DOGE, %s FDUSD", initialDOGE.String(), initialUSDT.String())
@@ -109,9 +114,8 @@ func checkFee() bool {
 
 func initSellOrders(init bool) error {
 	if init {
-		sellOrders = 0
 		RunSetInitPrice(symbol, 0)
-		RunSetEachRoundTime(symbol, time.Now().Unix())
+		RunSetInt64(symbol, Filed_EachRoundTime, time.Now().Unix())
 	}
 
 	//每次重启服务后，仍然根据上次的价格创建initSellPrice数组
@@ -120,11 +124,20 @@ func initSellOrders(init bool) error {
 		log.Logger.Error(err)
 		return err
 	}
-	RunSetInitPrice(symbol, price)
+	if price == 0 {
+		price, err := getCurrentPrice()
+		if err != nil {
+			log.Logger.Error(err)
+			return err
+		}
+		RunSetInitPrice(symbol, price)
+	}
 
 	//每轮的开始时间
-	eachRoundTime := RunGetEachRoundTime(symbol)
-	RunSetEachRoundTime(symbol, eachRoundTime)
+	eachRoundTime := RunGetInt64(symbol, Filed_EachRoundTime)
+	if eachRoundTime == 0 {
+		RunSetInt64(symbol, Filed_EachRoundTime, time.Now().Unix())
+	}
 
 	log.Logger.Debugf("[initSellOrders] Current price: %f", price)
 
@@ -210,7 +223,7 @@ func placeSells() (bool, int, int) {
 					}
 					if sameprice == false {
 						//是否存在相同的价格
-						key := fmt.Sprintf("sameSellPrice#%v#%v#%v", symbol, RunGetEachRoundTime(symbol), sellPrice.String())
+						key := fmt.Sprintf("sameSellPrice#%v#%v#%v", symbol, RunGetInt64(symbol, Filed_EachRoundTime), sellPrice.String())
 						val, err := redis.GetString(key)
 						if err != nil {
 							log.Logger.Error(err)
@@ -218,10 +231,10 @@ func placeSells() (bool, int, int) {
 						}
 						//不存在进行补单和前几手可以重复挂单
 						if val == "" || i < baseDoubleIndex {
-							openSells++  //局部变量
-							sellOrders++ //全局变量
+							openSells++ //局部变量
 							haveNewSell = true
 							placeSellLastTime = time.Now().Unix()
+							RunSetInt64(symbol, Filed_PlaceSellLastTime, placeSellLastTime)
 							if _, err := placeOrder("SELL", initSellQty[i].String(), sellPrice.String()); err == nil {
 								redis.SetEX(key, "1", 7*24*3600*time.Second)
 								//log.Logger.Debugf("sell price key %v", key)
@@ -365,7 +378,7 @@ func placeBuy(haveNewSell bool, openSells, openBuys int) {
 			message.SendDingTalkRobit(true, "oneplat", "doge2_every_buy_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/10*60), err.Error())
 		} else {
 			buyOrderId = orderId
-			RunSetBuyOrderId(symbol, buyOrderId)
+			RunSetInt64(symbol, Filed_BuyOrderId, buyOrderId)
 			placeBuyLastTime = time.Now().Unix()
 		}
 	}
@@ -431,8 +444,8 @@ func checkFinish() {
 
 					price, _ := getCurrentPrice()
 
-					logmsg := fmt.Sprintf("E... %v 交易量:%v 卖单成交数:%v 套利:%vdoge 总套利:%vdoge(chanU:%v) \n套利次数:%v 余额:%vdoge(chanU:%v) 当前价格:%v",
-						symbol, qty, sellOrders-openSells, dogeDelta, totalDogeDelta, totalUsdtDelta,
+					logmsg := fmt.Sprintf("E... %v 交易量:%v 套利:%vdoge 总套利:%vdoge(chanU:%v) \n套利次数:%v 余额:%vdoge(chanU:%v) 当前价格:%v",
+						symbol, qty, dogeDelta, totalDogeDelta, totalUsdtDelta,
 						profitTimes, currentDOGE.String(), currentUSDT.String(), price)
 					log.Logger.Debugf("[checkFinish] profit: %v", logmsg)
 					message.SendDingTalkRobit(true, "oneplat", "doge2_every_profit_"+symbol, fmt.Sprintf("%v", time.Now().Unix()), logmsg)
@@ -449,8 +462,10 @@ func checkFinish() {
 				//重新铺单
 				cancelOrders(binance.SideTypeSell, openOrders)
 				initSellOrders(true)
+				placeSellLastTime = time.Now().Unix()
+				RunSetInt64(symbol, Filed_PlaceSellLastTime, placeSellLastTime)
 				buyOrderId = 0
-				RunSetBuyOrderId(symbol, 0)
+				RunSetInt64(symbol, Filed_BuyOrderId, 0)
 				stop = false
 
 				continue
@@ -483,6 +498,7 @@ func checkFinish() {
 					cancelOrders(binance.SideTypeSell, openOrders)
 					initSellOrders(true)
 					placeSellLastTime = time.Now().Unix()
+					RunSetInt64(symbol, Filed_PlaceSellLastTime, placeSellLastTime)
 					stop = false
 				}
 			}

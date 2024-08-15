@@ -150,8 +150,7 @@ func RunGetInitPrice(symbol string) (float64, error) {
 	initprice := utils.ReadFile(fmt.Sprintf("files/down2_dcaservice.%v.initprice", symbol))
 	initprice = strings.Replace(initprice, "\n", "", -1)
 	if initprice == "" || initprice == "0" {
-		price, err := getCurrentPrice()
-		return price, err
+		return 0, nil
 	} else {
 		val, err := strconv.ParseFloat(initprice, 10)
 		return val, err
@@ -162,24 +161,8 @@ func RunSetInitPrice(symbol string, price float64) {
 	utils.UpdateFile(fmt.Sprintf("files/down2_dcaservice.%v.initprice", symbol), fmt.Sprintf("%v", price))
 }
 
-func RunGetEachRoundTime(symbol string) int64 {
-	val := utils.ReadFile(fmt.Sprintf("files/down2_dcaservice.%v.eachroundtime", symbol))
-	val = strings.Replace(val, "\n", "", -1)
-	if val == "" || val == "0" {
-		t := time.Now().Unix()
-		return t
-	} else {
-		val, _ := strconv.ParseInt(val, 10, 64)
-		return val
-	}
-}
-
-func RunSetEachRoundTime(symbol string, eachRoundTime int64) {
-	utils.UpdateFile(fmt.Sprintf("files/down2_dcaservice.%v.eachroundtime", symbol), fmt.Sprintf("%v", eachRoundTime))
-}
-
-func RunGetBuyOrderId(symbol string) int64 {
-	val := utils.ReadFile(fmt.Sprintf("files/down2_dcaservice.%v.buyorderid", symbol))
+func RunGetInt64(symbol string, filed string) int64 {
+	val := utils.ReadFile(fmt.Sprintf("files/down2_dcaservice.%v.%v", symbol, filed))
 	val = strings.Replace(val, "\n", "", -1)
 	if val == "" || val == "0" {
 		return 0
@@ -189,6 +172,6 @@ func RunGetBuyOrderId(symbol string) int64 {
 	}
 }
 
-func RunSetBuyOrderId(symbol string, buyorderid int64) {
-	utils.UpdateFile(fmt.Sprintf("files/down2_dcaservice.%v.buyorderid", symbol), fmt.Sprintf("%v", buyorderid))
+func RunSetInt64(symbol string, filed string, value int64) {
+	utils.UpdateFile(fmt.Sprintf("files/down2_dcaservice.%v.%v", symbol, filed), fmt.Sprintf("%v", value))
 }
