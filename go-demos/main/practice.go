@@ -1,21 +1,41 @@
 package main
 
-import "sync"
+import (
+	"fmt"
+	"sync"
+	"time"
+)
 
-type UserAges struct {
-	ages map[string]int
-	sync.Mutex
+var mu sync.RWMutex
+var count int
+
+func main() {
+	go A()
+	time.Sleep(2 * time.Second)
+	go func() {
+		fmt.Println("lock1")
+		mu.Lock()
+		defer mu.Unlock()
+		fmt.Println("lock2")
+		count++
+		fmt.Println(count)
+	}()
+	time.Sleep(time.Second * 10)
 }
-
-func (ua *UserAges) Add(name string, age int) {
-	ua.Lock()
-	defer ua.Unlock()
-	ua.ages[name] = age
+func A() {
+	mu.RLock()
+	defer mu.RUnlock()
+	fmt.Println("a")
+	B()
 }
-
-func (ua *UserAges) Get(name string) int {
-	if age, ok := ua.ages[name]; ok {
-		return age
-	}
-	return -1
+func B() {
+	fmt.Println("b")
+	time.Sleep(5 * time.Second)
+	C()
+}
+func C() {
+	fmt.Println("c")
+	mu.RLock()
+	defer mu.RUnlock()
+	fmt.Println("cc")
 }
