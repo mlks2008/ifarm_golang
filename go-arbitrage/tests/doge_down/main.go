@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"github.com/shopspring/decimal"
 	"math"
+	"os"
 	"time"
 
 	"github.com/adshao/go-binance/v2"
@@ -60,7 +61,9 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	//return
+	if os.Getenv("local") == "true" {
+		return
+	}
 
 	//加载buyorderid
 	buyOrderId = RunGetInt64(symbol, Filed_BuyOrderId)
@@ -125,7 +128,7 @@ func initSellOrders(init bool) error {
 		return err
 	}
 	if price == 0 {
-		price, err := getCurrentPrice()
+		price, err = getCurrentPrice()
 		if err != nil {
 			log.Logger.Error(err)
 			return err
