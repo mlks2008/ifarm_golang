@@ -378,7 +378,7 @@ func placeBuy(haveNewSell bool, openSells, openBuys int) {
 		orderId, err := placeOrder("BUY", dogeToBuyBack.String(), newBuyPrice.String())
 		if err != nil {
 			log.Logger.Error("[placeBuy] Error placeOrder:", err)
-			message.SendDingTalkRobit(true, "oneplat", "doge2_every_buy_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/10*60), err.Error())
+			message.SendDingTalkRobit(true, "oneplat", "doge2_every_buy_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/(10*60)), err.Error())
 		} else {
 			buyOrderId = orderId
 			RunSetInt64(symbol, Filed_BuyOrderId, buyOrderId)
