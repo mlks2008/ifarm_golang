@@ -18,13 +18,13 @@ import (
 var (
 	symbol             = "DOGEFDUSD"
 	firstQty           = 9000.0 //首笔挂单量
-	firstPriceIncrease = 1.004  //首笔价格增长比例
+	firstPriceIncrease = 1.003  //首笔价格增长比例
 
 	baseQty      = 4500.0 //Safety order size
 	baseIncrease = 1.814  //Safety order大小倍数
 
-	priceIncrease = 1.006  //每笔订单间隔比例(from init price)
-	priceFactor   = 1.404  //Safety order间隔倍数
+	priceIncrease = 1.004  //每笔订单间隔比例(from init price)
+	priceFactor   = 1.405  //Safety order间隔倍数
 	profitFactor  = 0.0035 //Target profit
 
 	maxSellOrders    = 10 //最大订单数
