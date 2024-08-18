@@ -17,18 +17,18 @@ import (
 
 var (
 	symbol             = "DOGEFDUSD"
-	firstQty           = 9000.0 //首笔挂单量
-	firstPriceIncrease = 1.003  //首笔价格增长比例
+	firstQty           = 12000.0 //首笔挂单量
+	firstPriceIncrease = 1.002   //首笔价格增长比例
 
-	baseQty      = 4500.0 //Safety order size
-	baseIncrease = 1.814  //Safety order大小倍数
+	baseQty      = 10000.0 //Safety order size
+	baseIncrease = 1.762   //Safety order大小倍数
 
-	priceIncrease = 1.004  //每笔订单间隔比例(from init price)
-	priceFactor   = 1.405  //Safety order间隔倍数
-	profitFactor  = 0.0035 //Target profit
+	priceIncrease = 1.005 //每笔订单间隔比例(from init price)
+	priceFactor   = 1.3   //Safety order间隔倍数
+	profitFactor  = 0.003 //Target profit
 
-	maxSellOrders    = 10 //最大订单数
-	actionSellOrders = 3  //活跃订单数
+	maxSellOrders    = 9 //最大订单数
+	actionSellOrders = 3 //活跃订单数
 	apiKey           = "mCXfycRaEiffizOajnB1VsVxytyUFnaA1tK4eX8QyuM8G565Weq5s4QXoyhkzwdE"
 	secretKey        = "wvRdYxo9O4IeBywbDCZgGhflwDwv2ERUbdQHUgoZ8JXTpUDGvFsTnXtzQOHxL9XW"
 	initSellQty      = make([]decimal.Decimal, maxSellOrders+1)
@@ -479,6 +479,9 @@ func checkFinish() {
 				//}
 			}
 		} else {
+			if stopByBalance == true {
+				continue
+			}
 			//本轮长时间没成交
 			if buyOrderId == 0 && placeSellLastTime > 0 && time.Now().Unix()-placeSellLastTime > 10*60 {
 				curPrice, err := getCurrentPrice()
