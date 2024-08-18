@@ -42,7 +42,7 @@ var (
 	Filed_EachRoundTime            = "eachroundtime"
 	Filed_PlaceSellLastTime string = "placeSellLastTime"
 )
-
+var stopByBalance bool //根据余额为0.001的方式暂停
 var client *binance.Client
 var stop bool //暂停买卖挂单
 
@@ -75,24 +75,19 @@ func main() {
 	//初始投入值
 	RunGetDogeCost(symbol + "-INIT")
 
-	////重启时取消所有挂单
-	//openOrders, err := openOrders()
-	//if err != nil {
-	//	panic(err)
-	//}
-	//cancelOrders("all", openOrders)
-	////重置每轮时间，重新挂单
-	//RunSetEachRoundTime(symbol, time.Now().Unix())
+	_, _, stopBalance, err := getBalances()
+	if err != nil {
+		panic(err)
+	}
+	checkStopByBalance("", "", stopBalance)
 
 	go checkFinish()
 
 	for {
 		if checkFee() {
 			haveNewSell, openSells, openBuys := placeSells()
-			//log.Logger.Debug("placeSells ok")
 			time.Sleep(time.Second * 10)
 			placeBuy(haveNewSell, openSells, openBuys)
-			//log.Logger.Debug("placeBuy ok")
 			time.Sleep(time.Second * 10)
 		}
 	}
@@ -180,7 +175,7 @@ func initSellOrders(init bool) error {
 // 挂卖
 // 否：如果有成交卖单，定时会把成交卖单在补上 --> 容易占用大量资金，一直上涨亏损过大
 func placeSells() (bool, int, int) {
-	if stop == true {
+	if stop == true || stopByBalance == true {
 		return false, -1, -1
 	}
 
@@ -250,15 +245,15 @@ func placeSells() (bool, int, int) {
 	}
 
 	//超时没有成交了
-	var timeout = (time.Now().Unix() - placeSellLastTime) / (3600 * 2)
+	var timeout = (time.Now().Unix() - placeSellLastTime) / (3600 * 4)
 	if placeSellLastTime > 0 && timeout >= 1 {
-		message.SendDingTalkRobit(true, "oneplat", "doge2_every_sell_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/(3600*2)), fmt.Sprintf("超过%v小时没有新卖单", timeout*2))
+		message.SendDingTalkRobit(true, "oneplat", "doge2_every_sell_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/(3600*4)), fmt.Sprintf("超过%v小时没有新卖单", timeout*4))
 	}
 	return haveNewSell, openSells, openBuys
 }
 
 func placeBuy(haveNewSell bool, openSells, openBuys int) {
-	if stop == true {
+	if stop == true || stopByBalance == true {
 		return
 	}
 	//没有产生新卖单情况
@@ -268,7 +263,7 @@ func placeBuy(haveNewSell bool, openSells, openBuys int) {
 			return
 		}
 		//当前有买单:不需要重新挂买单(安全点加个超时吧）
-		if openSells > 0 && openBuys > 0 && time.Now().Unix()-placeBuyLastTime < 60*60 {
+		if openSells > 0 && openBuys > 0 && time.Now().Unix()-placeBuyLastTime < 24*60*60 {
 			return
 		}
 		//当前没有买单:可能发生了取消买单成功但重新下买单失败，所以这里有个超过n分钟允许重新下单
@@ -280,7 +275,7 @@ func placeBuy(haveNewSell bool, openSells, openBuys int) {
 	runInitialUSDT, runInitialDOGE, _ := RunGetDogeCost(symbol)
 	log.Logger.Debugf("[placeBuy] Initial balances: %s DOGE, %s FDUSD", runInitialDOGE.String(), runInitialUSDT.String())
 
-	currentDOGE, currentUSDT, err := getBalances()
+	currentDOGE, currentUSDT, _, err := getBalances()
 	if err != nil {
 		log.Logger.Error("[placeBuy] Error getBalances:", err)
 		return
@@ -334,7 +329,7 @@ func placeBuy(haveNewSell bool, openSells, openBuys int) {
 	if dogeDelta < 0 {
 		if usdtDelta <= 0 {
 			logmsg := "异常:套利还未执行完，U的余额增量居然小于等于0"
-			message.SendDingTalkRobit(true, "oneplat", "doge2_every_profit_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/5*60), logmsg)
+			message.SendDingTalkRobit(true, "oneplat", "doge2_every_profit_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/(10*60)), logmsg)
 			return
 		}
 
@@ -378,7 +373,7 @@ func placeBuy(haveNewSell bool, openSells, openBuys int) {
 		orderId, err := placeOrder("BUY", dogeToBuyBack.String(), newBuyPrice.String())
 		if err != nil {
 			log.Logger.Error("[placeBuy] Error placeOrder:", err)
-			message.SendDingTalkRobit(true, "oneplat", "doge2_every_buy_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/(10*60)), err.Error())
+			message.SendDingTalkRobit(true, "oneplat", "doge2_every_buy_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/(4*60*60)), err.Error())
 		} else {
 			buyOrderId = orderId
 			RunSetInt64(symbol, Filed_BuyOrderId, buyOrderId)
@@ -390,7 +385,15 @@ func placeBuy(haveNewSell bool, openSells, openBuys int) {
 func checkFinish() {
 	var profitTimes int
 	for {
-		time.Sleep(time.Second * 10)
+		time.Sleep(time.Second * 5)
+		currentDOGE, currentUSDT, stopBalance, err := getBalances()
+		if err != nil {
+			log.Logger.Errorf("getBalances", err)
+			continue
+		}
+		checkStopByBalance(currentUSDT.String(), currentDOGE.String(), stopBalance)
+
+		time.Sleep(time.Second * 5)
 		openOrders, err := openOrders()
 		if err != nil {
 			stop = false
@@ -408,13 +411,6 @@ func checkFinish() {
 				//stop后有可能placeSells或placeBuy还在执行，这里先sleep会
 				stop = true
 				time.Sleep(time.Second * 2)
-
-				currentDOGE, currentUSDT, err := getBalances()
-				if err != nil {
-					stop = false
-					log.Logger.Errorf("getBalances", err)
-					continue
-				}
 
 				var openSells int
 				for _, order := range openOrders {
@@ -506,6 +502,34 @@ func checkFinish() {
 				}
 			}
 		}
+	}
+}
+
+// stopBalance:0时暂停服务，其它值恢复(0.001时恢复前重置所有，相当于重新所有files后重启服务)
+func checkStopByBalance(currentUSDT, currentDOGE string, stopBalance decimal.Decimal) {
+	if stopByBalance == false && stopBalance.Cmp(decimal.NewFromFloat(0)) == 0 {
+		stopByBalance = true
+		message.SendDingTalkRobit(true, "oneplat", "doge2_every_stop_"+symbol, fmt.Sprintf("%v", time.Now().Unix()), "已暂停")
+	}
+
+	if stopByBalance == true && stopBalance.Cmp(decimal.NewFromFloat(0)) != 0 {
+		//0.001表示要重置初始成本
+		if stopBalance.Cmp(decimal.NewFromFloat(0.001)) == 0 {
+			RunSetDogeCost(symbol, currentUSDT, currentDOGE)
+
+			openOrders, err := openOrders()
+			if err != nil {
+				log.Logger.Error(err)
+				return
+			}
+			cancelOrders(binance.SideTypeSell, openOrders)
+			initSellOrders(true)
+			placeSellLastTime = time.Now().Unix()
+			RunSetInt64(symbol, Filed_PlaceSellLastTime, placeSellLastTime)
+		}
+
+		stopByBalance = false
+		message.SendDingTalkRobit(true, "oneplat", "doge2_every_start_"+symbol, fmt.Sprintf("%v", time.Now().Unix()), "已恢复")
 	}
 }
 

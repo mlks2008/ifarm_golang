@@ -98,13 +98,13 @@ func getCurrentPrice() (float64, error) {
 	return price, nil
 }
 
-func getBalances() (decimal.Decimal, decimal.Decimal, error) {
+func getBalances() (decimal.Decimal, decimal.Decimal, decimal.Decimal, error) {
 	balances, err := client.NewGetAccountService().Do(context.Background())
 	if err != nil {
 		log.Logger.Error(err)
-		return decimal.Zero, decimal.Zero, err
+		return decimal.Zero, decimal.Zero, decimal.Zero, err
 	}
-	var dogeBalance, usdtBalance decimal.Decimal
+	var dogeBalance, fdusdBalance, stopBalance decimal.Decimal
 	for _, b := range balances.Balances {
 		if b.Asset == "DOGE" {
 			b1, _ := decimal.NewFromString(b.Free)
@@ -113,10 +113,14 @@ func getBalances() (decimal.Decimal, decimal.Decimal, error) {
 		} else if b.Asset == "FDUSD" {
 			b1, _ := decimal.NewFromString(b.Free)
 			b2, _ := decimal.NewFromString(b.Locked)
-			usdtBalance = b1.Add(b2)
+			fdusdBalance = b1.Add(b2)
+		} else if b.Asset == "LUNC" {
+			b1, _ := decimal.NewFromString(b.Free)
+			b2, _ := decimal.NewFromString(b.Locked)
+			stopBalance = b1.Add(b2)
 		}
 	}
-	return dogeBalance, usdtBalance, nil
+	return dogeBalance, fdusdBalance, stopBalance, nil
 }
 
 // ------------------------------------------ files -------------------------------------------------
@@ -125,7 +129,7 @@ func RunGetDogeCost(symbol string) (decimal.Decimal, decimal.Decimal, int64) {
 	cost := utils.ReadFile(fmt.Sprintf("files/down2_dcaservice.%v.cost", symbol))
 	cost = strings.Replace(cost, "\n", "", -1)
 	if cost == "" {
-		currentDOGE, currentUSDT, err := getBalances()
+		currentDOGE, currentUSDT, _, err := getBalances()
 		if err != nil {
 			panic(err)
 		}
