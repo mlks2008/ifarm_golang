@@ -184,6 +184,18 @@ func placeSells() (bool, int, int) {
 		log.Logger.Error("[placeSells] Error openOrders:", err)
 		return false, -1, -1
 	}
+
+	//当价格小于0.09时自动暂停
+	price, err := RunGetInitPrice(symbol)
+	if err != nil {
+		log.Logger.Error(err)
+		return false, -1, -1
+	}
+	if price < 0.09 {
+		message.SendDingTalkRobit(true, "oneplat", "doge2_every_autostop_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/(60*60*12)), "因价格小于0.09，将不挂单")
+		return false, -1, -1
+	}
+
 	//统计卖挂单数
 	var openSells int
 	var openBuys int
