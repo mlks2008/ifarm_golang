@@ -288,7 +288,7 @@ func placeBuy(haveNewSell bool, openSells, openBuys int) {
 		return
 	}
 	//计算本轮所有卖单获得U与当前U余额比较，取小值作为本次的购买本金
-	var calcUsdtDelta = func(dogeDelta float64, usdtBalance decimal.Decimal) (float64, bool) {
+	var calcUsdtDelta = func(dogeDelta float64, usdtBalance decimal.Decimal, initialUSDT decimal.Decimal) (float64, bool) {
 		//还没有卖出
 		if dogeDelta >= 0 {
 			return 0, false
@@ -296,10 +296,14 @@ func placeBuy(haveNewSell bool, openSells, openBuys int) {
 
 		//当前挂单中最小的卖单价
 		var minSellPrice = decimal.Zero
+		var partiallyFilled bool
 		for _, order := range openOrders {
 			var price, _ = decimal.NewFromString(order.Price)
 			if order.Side == binance.SideTypeSell && (minSellPrice == decimal.Zero || price.Cmp(minSellPrice) < 0) {
 				minSellPrice = price
+			}
+			if order.Side == binance.SideTypeSell && order.Status == binance.OrderStatusTypePartiallyFilled {
+				partiallyFilled = true
 			}
 		}
 
@@ -312,18 +316,23 @@ func placeBuy(haveNewSell bool, openSells, openBuys int) {
 		}
 		log.Logger.Debugf("[placeBuy] calcSell: %s FDUSD, minSellPrice: %v", total.String(), minSellPrice.String())
 
-		//return usdtBalance.Float64()
-		//两者取小
-		if total.Cmp(usdtBalance) > 0 {
-			return usdtBalance.Float64()
+		if partiallyFilled == true {
+			var curUsdt, _ = usdtBalance.Float64()
+			var initUsdt, _ = initialUSDT.Float64()
+			return curUsdt - initUsdt, true
 		} else {
-			return total.Float64()
+			//两者取小
+			if total.Cmp(usdtBalance) > 0 {
+				return usdtBalance.Float64()
+			} else {
+				return total.Float64()
+			}
 		}
 	}
 
 	dogeDelta, _ := currentDOGE.Sub(runInitialDOGE).Float64()
 	//usdtDelta, _ := currentUSDT.Sub(runInitialUSDT).Float64()
-	usdtDelta, _ := calcUsdtDelta(dogeDelta, currentUSDT)
+	usdtDelta, _ := calcUsdtDelta(dogeDelta, currentUSDT, runInitialUSDT)
 	log.Logger.Debugf("[placeBuy] dogeDelta: %v, usdtDelta: %v buyOrderId: %v", dogeDelta, usdtDelta, buyOrderId)
 	//doge为负，表示已有卖单成交，开始挂买单
 	if dogeDelta < 0 {
