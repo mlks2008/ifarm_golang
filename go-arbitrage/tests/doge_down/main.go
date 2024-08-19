@@ -75,11 +75,11 @@ func main() {
 	//初始投入值
 	RunGetDogeCost(symbol + "-INIT")
 
-	_, _, stopBalance, err := getBalances()
+	currentDOGE, currentUSDT, stopBalance, err := getBalances()
 	if err != nil {
 		panic(err)
 	}
-	checkStopByBalance("", "", stopBalance)
+	checkStopByBalance(currentUSDT.String(), currentDOGE.String(), stopBalance)
 
 	go checkFinish()
 
@@ -424,8 +424,6 @@ func checkFinish() {
 
 				//套利通知
 				{
-					profitTimes++
-
 					_, runDOGE, _ := RunGetDogeCost(symbol)
 					initUSDT, initDOGE, initTime := RunGetDogeCost(symbol + "-INIT")
 
@@ -437,6 +435,8 @@ func checkFinish() {
 						message.SendDingTalkRobit(true, "oneplat", "doge2_every_continue_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/3600), "发生了买单已成交，但关闭前又有卖单成交，继续交易...")
 						continue
 					}
+
+					profitTimes++
 
 					totalDogeDelta, _ := currentDOGE.Sub(initDOGE).Float64()
 					totalUsdtDelta, _ := currentUSDT.Sub(initUSDT).Float64()
