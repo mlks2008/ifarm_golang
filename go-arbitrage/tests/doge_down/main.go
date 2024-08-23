@@ -27,14 +27,18 @@ var (
 	priceFactor   = 1.35  //Safety order间隔倍数
 	profitFactor  = 0.003 //Target profit
 
-	maxSellOrders    = 9 //最大订单数
+	maxSellOrders    = 6 //最大订单数
 	actionSellOrders = 3 //活跃订单数
-	apiKey           = "mCXfycRaEiffizOajnB1VsVxytyUFnaA1tK4eX8QyuM8G565Weq5s4QXoyhkzwdE"
-	secretKey        = "wvRdYxo9O4IeBywbDCZgGhflwDwv2ERUbdQHUgoZ8JXTpUDGvFsTnXtzQOHxL9XW"
-	initSellQty      = make([]decimal.Decimal, maxSellOrders+1)
-	initSellPrice    = make([]decimal.Decimal, maxSellOrders+1)
-	initRadios       = make([]decimal.Decimal, maxSellOrders+1)
-	baseDoubleIndex  = 0 //前几手可以补单，之后不补单，否则很快占用大量资金
+	// mainapi
+	//apiKey           = "mCXfycRaEiffizOajnB1VsVxytyUFnaA1tK4eX8QyuM8G565Weq5s4QXoyhkzwdE"
+	//secretKey        = "wvRdYxo9O4IeBywbDCZgGhflwDwv2ERUbdQHUgoZ8JXTpUDGvFsTnXtzQOHxL9XW"
+	// oneplat
+	apiKey          = "3JiMItY7JeQoxWNAlylhsxCI38hysP5OZUgypWewm3PhKUaVx9pMv3dTUlyT5sbS"
+	secretKey       = "iPP0IRusNqUhKtVyl0gSteRnTEpMUXttUWSekH2MeqljcLkfzwyJ6J8nmUyUOxhn"
+	initSellQty     = make([]decimal.Decimal, maxSellOrders+1)
+	initSellPrice   = make([]decimal.Decimal, maxSellOrders+1)
+	initRadios      = make([]decimal.Decimal, maxSellOrders+1)
+	baseDoubleIndex = 0 //前几手可以补单，之后不补单，否则很快占用大量资金
 )
 
 var (
@@ -274,12 +278,12 @@ func placeBuy(haveNewSell bool, openSells, openBuys int) {
 		if openSells == -1 && openBuys == -1 {
 			return
 		}
-		//当前有买单:不需要重新挂买单(安全点加个超时吧）
-		if openSells > 0 && openBuys > 0 && time.Now().Unix()-placeBuyLastTime < 24*60*60 {
-			return
-		}
 		//当前没有买单:可能发生了取消买单成功但重新下买单失败，所以这里有个超过n分钟允许重新下单
 		if openSells > 0 && openBuys == 0 && time.Now().Unix()-placeBuyLastTime < 5*60 {
+			return
+		}
+		//todo 当前有买单:不需要重新挂买单(安全点加个超时吧）
+		if openSells > 0 && openBuys > 0 && time.Now().Unix()-placeBuyLastTime < 5*60*60 {
 			return
 		}
 	}
