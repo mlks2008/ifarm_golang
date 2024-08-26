@@ -280,11 +280,11 @@ func placeBuy(haveNewSell bool, openSells, openBuys int) {
 			return
 		}
 		//当前没有买单:可能发生了取消买单成功但重新下买单失败，所以这里有个超过n分钟允许重新下单
-		if openSells > 0 && openBuys == 0 && time.Now().Unix()-placeBuyLastTime < 5*60 {
+		if openBuys == 0 && openSells >= 0 && time.Now().Unix()-placeBuyLastTime < 5*60 {
 			return
 		}
-		//todo 当前有买单:不需要重新挂买单(安全点加个超时吧）优化：当前已成交卖数数 与 新计算卖数不一致时 重新下买单
-		if openSells > 0 && openBuys > 0 && time.Now().Unix()-placeBuyLastTime < 5*60*60 {
+		//todo 当前有买单:可能已经达到最大挂单数，不会在挂新订单，此时需要定时重挂一次
+		if openBuys > 0 && openSells >= 0 && time.Now().Unix()-placeBuyLastTime < 5*60 {
 			return
 		}
 	}
