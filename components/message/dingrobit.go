@@ -65,7 +65,7 @@ func init() {
 				secret = "SEC73d9e7dbe6886e8a571864c171ddad5c73c8338d35c24d0ff0093f4c95b97510"
 				accesstoken = "08fefe23f6dc8bdf3486f379c42c4b1be9c3a988360ea0592e70b9b0c35a2c71"
 				data = fmt.Sprintf(`{"msgtype": "text","text": {"content": "%v"}}`, fmt.Sprintf("%v\nmd:%v \t%v", log.Content, log.Robot, time.Now().Format("01-02 15:04")))
-			} else if strings.ToLower(log.Robot) == "oneplat" {
+			} else if strings.ToLower(log.Robot) == "oneplat" || strings.ToLower(log.Robot) == "mainapi" {
 				//套币机器人
 				secret = "SEC05dd86028265682c00b7d8e7abf1b0a73e71277414fe10c670cce83483e6c597"
 				accesstoken = "45ed11014c6e2ca3bc171166f4307213b682b0960280433c5a9f7063863c7603"
