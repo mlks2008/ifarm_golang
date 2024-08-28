@@ -6,6 +6,7 @@ import (
 	"components/message"
 	"components/myconfig"
 	"context"
+	"flag"
 	"fmt"
 	"github.com/shopspring/decimal"
 	"math"
@@ -59,7 +60,29 @@ var buySuccLastTime int64   //最近一次买单成功执行时间，挂买单�
 var placeSellLastTime int64 //最近一次挂卖单时间，定时检测，如果发现很久时没有挂卖了，这时可能在下跌中，重新挂卖单列表
 var startTime = time.Now().Unix()
 
+var (
+	apikey string
+)
+
+func init() {
+	flag.StringVar(&apikey, "apikey", "", "eg: -apikey oneplat/mainapi")
+}
+
 func main() {
+	flag.Parse()
+
+	if apikey == "oneplat" {
+		// oneplat
+		apiKey = "3JiMItY7JeQoxWNAlylhsxCI38hysP5OZUgypWewm3PhKUaVx9pMv3dTUlyT5sbS"
+		secretKey = "iPP0IRusNqUhKtVyl0gSteRnTEpMUXttUWSekH2MeqljcLkfzwyJ6J8nmUyUOxhn"
+	} else if apikey == "mainapi" {
+		// mainapi
+		apiKey = "mCXfycRaEiffizOajnB1VsVxytyUFnaA1tK4eX8QyuM8G565Weq5s4QXoyhkzwdE"
+		secretKey = "wvRdYxo9O4IeBywbDCZgGhflwDwv2ERUbdQHUgoZ8JXTpUDGvFsTnXtzQOHxL9XW"
+	} else {
+		panic("apikey not exist")
+	}
+
 	log.InitLogger("./", "testDoge", true)
 
 	client = binance.NewClient(apiKey, secretKey)
@@ -73,14 +96,14 @@ func main() {
 	}
 
 	//加载buyorderid
-	buyOrderId = RunGetInt64(symbol, Filed_BuyOrderId)
-	placeSellLastTime = RunGetInt64(symbol, Filed_PlaceSellLastTime)
+	buyOrderId = RunGetInt64(apikey, symbol, Filed_BuyOrderId)
+	placeSellLastTime = RunGetInt64(apikey, symbol, Filed_PlaceSellLastTime)
 	log.Logger.Debugf("Load buyOrderId: %v, placeSellLastTime: %v", buyOrderId, placeSellLastTime)
 
-	initialUSDT, initialDOGE, _ := RunGetDogeCost(symbol)
+	initialUSDT, initialDOGE, _ := RunGetDogeCost(apikey, symbol)
 	log.Logger.Debugf("Initial balances: %s DOGE, %s FDUSD", initialDOGE.String(), initialUSDT.String())
 	//初始投入值
-	RunGetDogeCost(symbol + "-INIT")
+	RunGetDogeCost(apikey, symbol+"-INIT")
 
 	currentDOGE, currentUSDT, stopBalance, err := getBalances()
 	if err != nil {
@@ -119,12 +142,12 @@ func checkFee() bool {
 
 func initSellOrders(init bool) error {
 	if init {
-		RunSetInitPrice(symbol, 0)
-		RunSetInt64(symbol, Filed_EachRoundTime, time.Now().Unix())
+		RunSetInitPrice(apikey, symbol, 0)
+		RunSetInt64(apikey, symbol, Filed_EachRoundTime, time.Now().Unix())
 	}
 
 	//每次重启服务后，仍然根据上次的价格创建initSellPrice数组
-	price, err := RunGetInitPrice(symbol)
+	price, err := RunGetInitPrice(apikey, symbol)
 	if err != nil {
 		log.Logger.Error(err)
 		return err
@@ -135,13 +158,13 @@ func initSellOrders(init bool) error {
 			log.Logger.Error(err)
 			return err
 		}
-		RunSetInitPrice(symbol, price)
+		RunSetInitPrice(apikey, symbol, price)
 	}
 
 	//每轮的开始时间
-	eachRoundTime := RunGetInt64(symbol, Filed_EachRoundTime)
+	eachRoundTime := RunGetInt64(apikey, symbol, Filed_EachRoundTime)
 	if eachRoundTime == 0 {
-		RunSetInt64(symbol, Filed_EachRoundTime, time.Now().Unix())
+		RunSetInt64(apikey, symbol, Filed_EachRoundTime, time.Now().Unix())
 	}
 
 	log.Logger.Debugf("[initSellOrders] Current price: %f", price)
@@ -187,7 +210,7 @@ func placeSells() (bool, int, int) {
 	}
 
 	//当价格小于0.09时自动暂停
-	price, err := RunGetInitPrice(symbol)
+	price, err := RunGetInitPrice(apikey, symbol)
 	if err != nil {
 		log.Logger.Error(err)
 		return false, -1, -1
@@ -240,7 +263,7 @@ func placeSells() (bool, int, int) {
 					}
 					if sameprice == false {
 						//是否存在相同的价格
-						key := fmt.Sprintf("sameSellPrice#%v#%v#%v", symbol, RunGetInt64(symbol, Filed_EachRoundTime), sellPrice.String())
+						key := fmt.Sprintf("sameSellPrice#%v#%v#%v", symbol, RunGetInt64(apikey, symbol, Filed_EachRoundTime), sellPrice.String())
 						val, err := redis.GetString(key)
 						if err != nil {
 							log.Logger.Error(err)
@@ -251,7 +274,7 @@ func placeSells() (bool, int, int) {
 							openSells++ //局部变量
 							haveNewSell = true
 							placeSellLastTime = time.Now().Unix()
-							RunSetInt64(symbol, Filed_PlaceSellLastTime, placeSellLastTime)
+							RunSetInt64(apikey, symbol, Filed_PlaceSellLastTime, placeSellLastTime)
 							if _, err := placeOrder("SELL", initSellQty[i].String(), sellPrice.String()); err == nil {
 								redis.SetEX(key, "1", 7*24*3600*time.Second)
 							}
@@ -295,7 +318,7 @@ func placeBuy(haveNewSell bool, openSells, openBuys int) {
 		}
 	}
 
-	runInitialUSDT, runInitialDOGE, _ := RunGetDogeCost(symbol)
+	runInitialUSDT, runInitialDOGE, _ := RunGetDogeCost(apikey, symbol)
 	log.Logger.Debugf("[placeBuy] Initial balances: %s DOGE, %s FDUSD", runInitialDOGE.String(), runInitialUSDT.String())
 
 	currentDOGE, currentUSDT, _, err := getBalances()
@@ -368,7 +391,7 @@ func placeBuy(haveNewSell bool, openSells, openBuys int) {
 
 		var tmpReturnProfitDoge int64
 		//可能一直上涨没有大的回调，这时需要把之前的收益拿出来，减少本次的买回量(doge),确保可以成交（收益回撤了）
-		_, firstInitialDOGE, _ := RunGetDogeCost(symbol + "-INIT")
+		_, firstInitialDOGE, _ := RunGetDogeCost(apikey, symbol+"-INIT")
 		totalProfitDoge, _ := runInitialDOGE.Sub(firstInitialDOGE).Float64()
 		if buySuccLastTime > 0 && time.Now().Unix()-buySuccLastTime > 24*3600 {
 			tmpReturnProfitDoge = int64(totalProfitDoge / 3)
@@ -414,7 +437,7 @@ func placeBuy(haveNewSell bool, openSells, openBuys int) {
 		} else {
 			buyOrderId = orderId
 			returnProfitDoge = tmpReturnProfitDoge
-			RunSetInt64(symbol, Filed_BuyOrderId, buyOrderId)
+			RunSetInt64(apikey, symbol, Filed_BuyOrderId, buyOrderId)
 			placeBuyLastTime = time.Now().Unix()
 		}
 	}
@@ -462,8 +485,8 @@ func checkFinish() {
 
 				//套利通知
 				{
-					_, runDOGE, _ := RunGetDogeCost(symbol)
-					initUSDT, initDOGE, initTime := RunGetDogeCost(symbol + "-INIT")
+					_, runDOGE, _ := RunGetDogeCost(apikey, symbol)
+					initUSDT, initDOGE, initTime := RunGetDogeCost(apikey, symbol+"-INIT")
 
 					dogeDelta, _ := currentDOGE.Sub(runDOGE).Float64()
 					//说明又有卖单成交了，这次套利还要继续(要扣除回撤部分)
@@ -501,9 +524,9 @@ func checkFinish() {
 				cancelOrders(binance.SideTypeSell, openOrders)
 				initSellOrders(true)
 				placeSellLastTime = time.Now().Unix()
-				RunSetInt64(symbol, Filed_PlaceSellLastTime, placeSellLastTime)
+				RunSetInt64(apikey, symbol, Filed_PlaceSellLastTime, placeSellLastTime)
 				buyOrderId = 0
-				RunSetInt64(symbol, Filed_BuyOrderId, 0)
+				RunSetInt64(apikey, symbol, Filed_BuyOrderId, 0)
 				stop = false
 
 				continue
@@ -528,7 +551,7 @@ func checkFinish() {
 					log.Logger.Error("[placeSells] Error getCurrentPrice:", err)
 					continue
 				}
-				initPrice, err := RunGetInitPrice(symbol)
+				initPrice, err := RunGetInitPrice(apikey, symbol)
 				if err != nil {
 					log.Logger.Error(err)
 					continue
@@ -539,7 +562,7 @@ func checkFinish() {
 					cancelOrders(binance.SideTypeSell, openOrders)
 					initSellOrders(true)
 					placeSellLastTime = time.Now().Unix()
-					RunSetInt64(symbol, Filed_PlaceSellLastTime, placeSellLastTime)
+					RunSetInt64(apikey, symbol, Filed_PlaceSellLastTime, placeSellLastTime)
 					stop = false
 				}
 			}
@@ -557,7 +580,7 @@ func checkStopByBalance(currentUSDT, currentDOGE string, stopBalance decimal.Dec
 	if stopByBalance == true && stopBalance.Cmp(decimal.NewFromFloat(0)) != 0 {
 		//0.001表示要重置初始成本
 		if stopBalance.Cmp(decimal.NewFromFloat(0.001)) == 0 {
-			RunSetDogeCost(symbol, currentUSDT, currentDOGE)
+			RunSetDogeCost(apikey, symbol, currentUSDT, currentDOGE)
 
 			openOrders, err := openOrders()
 			if err != nil {
@@ -567,7 +590,7 @@ func checkStopByBalance(currentUSDT, currentDOGE string, stopBalance decimal.Dec
 			cancelOrders(binance.SideTypeSell, openOrders)
 			initSellOrders(true)
 			placeSellLastTime = time.Now().Unix()
-			RunSetInt64(symbol, Filed_PlaceSellLastTime, placeSellLastTime)
+			RunSetInt64(apikey, symbol, Filed_PlaceSellLastTime, placeSellLastTime)
 		}
 
 		stopByBalance = false
@@ -581,11 +604,11 @@ func dogeBalanceSaveFile(initTime int64, currentUSDT, currentDOGE string) {
 
 	//保存当前余额
 	log.Logger.Debugf("[checkFinish] Initial balances: %s DOGE, %s FDUSD", currentDOGE, currentUSDT)
-	RunSetDogeCost(symbol, currentUSDT, currentDOGE)
+	RunSetDogeCost(apikey, symbol, currentUSDT, currentDOGE)
 
 	//每24小时结算一次：重置初始投入值，在回撤计算时最多回撤24小时收益
 	if (time.Now().Unix()-initTime)/(24*3600) >= 1 {
-		RunSetDogeCost(symbol+"-INIT", currentUSDT, currentDOGE)
+		RunSetDogeCost(apikey, symbol+"-INIT", currentUSDT, currentDOGE)
 	}
 }
 

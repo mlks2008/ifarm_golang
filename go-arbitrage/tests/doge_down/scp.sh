@@ -8,7 +8,7 @@ export GOROOT=/usr/local/go
 go mod tidy
 go build -o doge
 
-COPYFILE_DISABLE=1 tar --no-xattrs -zcvf doge.bin restart.sh stop.sh doge
+COPYFILE_DISABLE=1 tar --no-xattrs -zcvf doge.bin mainapi-restart.sh mainapi-stop.sh oneplat-restart.sh oneplat-stop.sh doge
 rm -rf doge
 
 echo "上传执行程序..."

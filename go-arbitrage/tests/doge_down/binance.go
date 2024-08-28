@@ -125,15 +125,15 @@ func getBalances() (decimal.Decimal, decimal.Decimal, decimal.Decimal, error) {
 
 // ------------------------------------------ files -------------------------------------------------
 
-func RunGetDogeCost(symbol string) (decimal.Decimal, decimal.Decimal, int64) {
-	cost := utils.ReadFile(fmt.Sprintf("files/down2_dcaservice.%v.cost", symbol))
+func RunGetDogeCost(apikey, symbol string) (decimal.Decimal, decimal.Decimal, int64) {
+	cost := utils.ReadFile(fmt.Sprintf("files/down2_dcaservice.%v.%v.cost", apikey, symbol))
 	cost = strings.Replace(cost, "\n", "", -1)
 	if cost == "" {
 		currentDOGE, currentUSDT, _, err := getBalances()
 		if err != nil {
 			panic(err)
 		}
-		RunSetDogeCost(symbol, currentUSDT.String(), currentDOGE.String())
+		RunSetDogeCost(apikey, symbol, currentUSDT.String(), currentDOGE.String())
 		return currentUSDT, currentDOGE, time.Now().Unix()
 		//RunSetUsdtCost(symbol, "0", "1772424")
 		//return decimal.Zero, decimal.NewFromFloat(1772424) //1778380
@@ -146,12 +146,12 @@ func RunGetDogeCost(symbol string) (decimal.Decimal, decimal.Decimal, int64) {
 	}
 }
 
-func RunSetDogeCost(symbol string, usdtbalance string, btcbalance string) {
-	utils.UpdateFile(fmt.Sprintf("files/down2_dcaservice.%v.cost", symbol), usdtbalance+","+btcbalance+","+fmt.Sprintf("%v", time.Now().Unix()))
+func RunSetDogeCost(apikey, symbol string, usdtbalance string, btcbalance string) {
+	utils.UpdateFile(fmt.Sprintf("files/down2_dcaservice.%v.%v.cost", apikey, symbol), usdtbalance+","+btcbalance+","+fmt.Sprintf("%v", time.Now().Unix()))
 }
 
-func RunGetInitPrice(symbol string) (float64, error) {
-	initprice := utils.ReadFile(fmt.Sprintf("files/down2_dcaservice.%v.initprice", symbol))
+func RunGetInitPrice(apikey, symbol string) (float64, error) {
+	initprice := utils.ReadFile(fmt.Sprintf("files/down2_dcaservice.%v.%v.initprice", apikey, symbol))
 	initprice = strings.Replace(initprice, "\n", "", -1)
 	if initprice == "" || initprice == "0" {
 		return 0, nil
@@ -161,12 +161,12 @@ func RunGetInitPrice(symbol string) (float64, error) {
 	}
 }
 
-func RunSetInitPrice(symbol string, price float64) {
-	utils.UpdateFile(fmt.Sprintf("files/down2_dcaservice.%v.initprice", symbol), fmt.Sprintf("%v", price))
+func RunSetInitPrice(apikey, symbol string, price float64) {
+	utils.UpdateFile(fmt.Sprintf("files/down2_dcaservice.%v.%v.initprice", apikey, symbol), fmt.Sprintf("%v", price))
 }
 
-func RunGetInt64(symbol string, filed string) int64 {
-	val := utils.ReadFile(fmt.Sprintf("files/down2_dcaservice.%v.%v", symbol, filed))
+func RunGetInt64(apikey, symbol string, filed string) int64 {
+	val := utils.ReadFile(fmt.Sprintf("files/down2_dcaservice.%v.%v.%v", apikey, symbol, filed))
 	val = strings.Replace(val, "\n", "", -1)
 	if val == "" || val == "0" {
 		return 0
@@ -176,6 +176,6 @@ func RunGetInt64(symbol string, filed string) int64 {
 	}
 }
 
-func RunSetInt64(symbol string, filed string, value int64) {
-	utils.UpdateFile(fmt.Sprintf("files/down2_dcaservice.%v.%v", symbol, filed), fmt.Sprintf("%v", value))
+func RunSetInt64(apikey, symbol string, filed string, value int64) {
+	utils.UpdateFile(fmt.Sprintf("files/down2_dcaservice.%v.%v.%v", apikey, symbol, filed), fmt.Sprintf("%v", value))
 }
