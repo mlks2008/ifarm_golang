@@ -53,6 +53,7 @@ var stopByBalance bool //LUNC:0时暂停服务，其它值恢复(0.001时恢复�
 var stop bool          //暂停买卖挂单
 
 var buyOrderId int64        //当前买单orderId
+var returnProfitDoge int64  //回撤数
 var placeBuyLastTime int64  //最近一次挂买单时间，定时检测，超过没有发生更新买单，重新计算下单
 var buySuccLastTime int64   //最近一次买单成功执行时间，挂买单时，如果发现很久没有成交，需要进行回撤处理
 var placeSellLastTime int64 //最近一次挂卖单时间，定时检测，如果发现很久时没有挂卖了，这时可能在下跌中，重新挂卖单列表
@@ -259,6 +260,11 @@ func placeSells() (bool, int, int) {
 				}
 			}
 		}
+
+		//卖单已全部成交，买单还在进行中
+		if openSells == 0 {
+			message.SendDingTalkRobit(true, "oneplat", "doge2_every_allsell_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/(3600*8)), "卖单已全部成交，买单还在进行中")
+		}
 	}
 
 	//超时没有成交了
@@ -360,15 +366,19 @@ func placeBuy(haveNewSell bool, openSells, openBuys int) {
 			return
 		}
 
+		var tmpReturnProfitDoge int64
 		//可能一直上涨没有大的回调，这时需要把之前的收益拿出来，减少本次的买回量(doge),确保可以成交（收益回撤了）
 		_, firstInitialDOGE, _ := RunGetDogeCost(symbol + "-INIT")
 		totalProfitDoge, _ := runInitialDOGE.Sub(firstInitialDOGE).Float64()
 		if buySuccLastTime > 0 && time.Now().Unix()-buySuccLastTime > 24*3600 {
-			dogeDelta = dogeDelta + totalProfitDoge/3
-		} else if buySuccLastTime > 0 && time.Now().Unix()-buySuccLastTime > 16*3600 {
-			dogeDelta = dogeDelta + totalProfitDoge/5
-		} else if buySuccLastTime > 0 && time.Now().Unix()-buySuccLastTime > 8*3600 {
-			dogeDelta = dogeDelta + totalProfitDoge/10
+			tmpReturnProfitDoge = int64(totalProfitDoge / 3)
+			dogeDelta = dogeDelta + float64(tmpReturnProfitDoge)
+		} else if buySuccLastTime > 0 && time.Now().Unix()-buySuccLastTime > 20*3600 {
+			tmpReturnProfitDoge = int64(totalProfitDoge / 5)
+			dogeDelta = dogeDelta + float64(tmpReturnProfitDoge)
+		} else if buySuccLastTime > 0 && time.Now().Unix()-buySuccLastTime > 12*3600 {
+			tmpReturnProfitDoge = int64(totalProfitDoge / 10)
+			dogeDelta = dogeDelta + float64(tmpReturnProfitDoge)
 		}
 
 		//要买回的币
@@ -403,6 +413,7 @@ func placeBuy(haveNewSell bool, openSells, openBuys int) {
 			message.SendDingTalkRobit(true, "oneplat", "doge2_every_buy_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/(4*60*60)), err.Error())
 		} else {
 			buyOrderId = orderId
+			returnProfitDoge = tmpReturnProfitDoge
 			RunSetInt64(symbol, Filed_BuyOrderId, buyOrderId)
 			placeBuyLastTime = time.Now().Unix()
 		}
@@ -439,12 +450,12 @@ func checkFinish() {
 				stop = true
 				time.Sleep(time.Second * 5)
 
-				var openSells int
-				for _, order := range openOrders {
-					if order.Side == binance.SideTypeSell {
-						openSells++
-					}
-				}
+				//var openSells int
+				//for _, order := range openOrders {
+				//	if order.Side == binance.SideTypeSell {
+				//		openSells++
+				//	}
+				//}
 
 				//最近一次买成功时间
 				buySuccLastTime = time.Now().Unix()
@@ -455,8 +466,8 @@ func checkFinish() {
 					initUSDT, initDOGE, initTime := RunGetDogeCost(symbol + "-INIT")
 
 					dogeDelta, _ := currentDOGE.Sub(runDOGE).Float64()
-					//说明又有卖单成交了，这次套利还要继续
-					if dogeDelta <= 0-baseQty {
+					//说明又有卖单成交了，这次套利还要继续(要扣除回撤部分)
+					if dogeDelta < float64(0-returnProfitDoge) {
 						stop = false
 						msg := fmt.Sprintf("发生了买单已成交，但关闭前又有卖单成交，继续交易(dogeDelta：%v)...", dogeDelta)
 						log.Logger.Error(msg)
