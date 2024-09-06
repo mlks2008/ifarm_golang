@@ -36,6 +36,7 @@ func SetProject(project string) {
 }
 
 func init() {
+	//3985658674 ff6052024
 	GConfig = Config{
 		Project:  "go-report",
 		PrintLog: true,

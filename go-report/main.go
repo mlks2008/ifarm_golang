@@ -17,22 +17,24 @@ func main() {
 	log.InitLogger("./", "goreport", true)
 
 	report300U()
-	reportDogeDown()
+	reportDogeDown_oneplat()
+	reportDogeDown_mainapi()
 
 	c := cron.New(cron.WithSeconds())
-	//_, err := c.AddFunc("0 0 */8 * * *", report300U)
-	_, err := c.AddFunc("0 0 23 * * *", report300U)
+
+	_, err := c.AddFunc("0 0 6 * * *", report300U)
 	if err != nil {
 		fmt.Println("Error scheduling task:", err)
 		return
 	}
 
-	_, err = c.AddFunc("0 0 6 * * *", reportDogeDown)
+	_, err = c.AddFunc("0 0 6 * * *", reportDogeDown_oneplat)
 	if err != nil {
 		fmt.Println("Error scheduling task:", err)
 		return
 	}
-	_, err = c.AddFunc("59 59 23 * * *", reportDogeDown)
+
+	_, err = c.AddFunc("0 0 6 * * *", reportDogeDown_mainapi)
 	if err != nil {
 		fmt.Println("Error scheduling task:", err)
 		return

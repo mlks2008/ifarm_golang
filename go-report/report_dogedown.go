@@ -10,13 +10,20 @@ import (
 	"time"
 )
 
-func reportDogeDown() {
+func reportDogeDown_oneplat() {
+	reportDogeDown1("oneplat")
+}
 
+func reportDogeDown_mainapi() {
+	reportDogeDown1("mainapi")
+}
+
+func reportDogeDown1(robot string) {
 	var getTr = func(lastDate time.Time, date time.Time, count int, totalEarn decimal.Decimal) (string, decimal.Decimal) {
 		var redis = redis2.NewRedisCli(myconfig.GConfig.Redis.Host, myconfig.GConfig.Redis.Password, myconfig.GConfig.Redis.DB)
 
 		//当天余额
-		key := fmt.Sprintf("dogedown-%v", date.Format("2006-01-02"))
+		key := fmt.Sprintf("%v-dogedown-%v", robot, date.Format("2006-01-02"))
 		bal, err := redis.GetDecimal(key)
 		if err != nil {
 			logmsg := fmt.Sprintf("redis.GetDecimal:%v", err.Error())
@@ -28,7 +35,7 @@ func reportDogeDown() {
 		var lastBal decimal.Decimal
 		if bal != decimal.Zero {
 			for {
-				lastKey := fmt.Sprintf("dogedown-%v", lastDate.Format("2006-01-02"))
+				lastKey := fmt.Sprintf("%v-dogedown-%v", robot, lastDate.Format("2006-01-02"))
 				lastBal, err = redis.GetDecimal(lastKey)
 				if err != nil {
 					logmsg := fmt.Sprintf("redis.GetDecimal:%v", err.Error())
@@ -116,7 +123,7 @@ func reportDogeDown() {
 	   .reason{text-align: left;}
 	   </style>
 		%v`, table)
-	var subject = fmt.Sprintf(`Farm Doge Daily Report %v`, nowDate)
+	var subject = fmt.Sprintf(`%v - Farm Doge Daily Report %v`, robot, nowDate)
 	var err = new(EmailHelper).SendEmail(subject, emailHtml)
 	if err != nil {
 		log.Logger.Error("SendEmail", err)

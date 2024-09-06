@@ -28,7 +28,7 @@ var (
 	priceFactor   = 1.35  //Safety order间隔倍数
 	profitFactor  = 0.003 //Target profit
 
-	maxSellOrders    = 6 //最大订单数
+	maxSellOrders    = 8 //最大订单数
 	actionSellOrders = 3 //活跃订单数
 	// mainapi
 	//apiKey           = "mCXfycRaEiffizOajnB1VsVxytyUFnaA1tK4eX8QyuM8G565Weq5s4QXoyhkzwdE"
@@ -66,11 +66,15 @@ var (
 
 func init() {
 	flag.StringVar(&robot, "robot", "", "eg: -robot oneplat/mainapi")
+	flag.IntVar(&maxSellOrders, "maxSellOrders", maxSellOrders, "")
+	flag.Parse()
+
+	initSellQty = make([]decimal.Decimal, maxSellOrders+1)
+	initSellPrice = make([]decimal.Decimal, maxSellOrders+1)
+	initRadios = make([]decimal.Decimal, maxSellOrders+1)
 }
 
 func main() {
-	flag.Parse()
-
 	if robot == "oneplat" {
 		// oneplat
 		apiKey = "3JiMItY7JeQoxWNAlylhsxCI38hysP5OZUgypWewm3PhKUaVx9pMv3dTUlyT5sbS"
@@ -84,6 +88,8 @@ func main() {
 	}
 
 	log.InitLogger("./", "testDoge", true)
+
+	log.Logger.Debugf("robot:%v,maxSellOrders:%v", robot, maxSellOrders)
 
 	client = binance.NewClient(apiKey, secretKey)
 
@@ -216,7 +222,8 @@ func placeSells() (bool, int, int) {
 		return false, -1, -1
 	}
 	if price < 0.09 {
-		message.SendDingTalkRobit(true, robot, "doge2_every_autostop_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/(60*60*12)), "因价格小于0.09，将不挂单")
+		RunSetInitPrice(robot, symbol, 0)
+		message.SendDingTalkRobit(true, robot, "doge2_every_autostop_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/(60*60*12)), fmt.Sprintf("因价格小于0.09，将不挂单:%v", price))
 		return false, -1, -1
 	}
 
@@ -356,7 +363,10 @@ func placeBuy(haveNewSell bool, openSells, openBuys int) {
 		var totalUSDT decimal.Decimal
 		var totalDoge decimal.Decimal
 		for i, sellPrice := range initSellPrice {
-			if sellPrice.Cmp(minSellPrice) < 0 {
+			if minSellPrice.Cmp(decimal.Zero) == 0 {
+				totalUSDT = totalUSDT.Add(sellPrice.Mul(initSellQty[i]))
+				totalDoge = totalDoge.Add(initSellQty[i])
+			} else if minSellPrice.Cmp(decimal.Zero) > 0 && sellPrice.Cmp(minSellPrice) < 0 {
 				totalUSDT = totalUSDT.Add(sellPrice.Mul(initSellQty[i]))
 				totalDoge = totalDoge.Add(initSellQty[i])
 			}
@@ -469,16 +479,13 @@ func checkFinish() {
 				continue
 			}
 			if orderstatus == true {
-				//stop后有可能placeSells或placeBuy还在执行，这里先sleep会
 				stop = true
-				time.Sleep(time.Second * 5)
-
-				//var openSells int
-				//for _, order := range openOrders {
-				//	if order.Side == binance.SideTypeSell {
-				//		openSells++
-				//	}
-				//}
+				time.Sleep(time.Second)
+				//重新最新余额
+				currentDOGE, currentUSDT, _, err = getBalances()
+				if err != nil {
+					continue
+				}
 
 				//最近一次买成功时间
 				buySuccLastTime = time.Now().Unix()
@@ -590,6 +597,7 @@ func checkStopByBalance(currentUSDT, currentDOGE string, stopBalance decimal.Dec
 			cancelOrders(binance.SideTypeSell, openOrders)
 			initSellOrders(true)
 			placeSellLastTime = time.Now().Unix()
+			buySuccLastTime = 0
 			RunSetInt64(robot, symbol, Filed_PlaceSellLastTime, placeSellLastTime)
 		}
 
@@ -615,6 +623,6 @@ func dogeBalanceSaveFile(initTime int64, currentUSDT, currentDOGE string) {
 // 每天余额保存到redis,后面做邮件报表使用
 func dogeBalanceSaveRedis(currentDOGE string) {
 	var redis = redis2.NewRedisCli("localhost:6379", "", 0)
-	var key = fmt.Sprintf("dogedown-%v", time.Now().Format("2006-01-02"))
+	var key = fmt.Sprintf("%v-dogedown-%v", robot, time.Now().Format("2006-01-02"))
 	redis.SetEX(key, currentDOGE, 60*24*3600*time.Second)
 }
