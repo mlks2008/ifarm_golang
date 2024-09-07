@@ -340,30 +340,31 @@ func placeBuy(haveNewSell bool, openSells, openBuys int) {
 		log.Logger.Error("[placeBuy] Error openOrders:", err)
 		return
 	}
-	//计算本轮所有卖单获得U与当前U余额比较，取小值作为本次的购买本金
-	var calcUsdtDelta = func(dogeDelta float64, usdtBalance decimal.Decimal, initialUSDT decimal.Decimal) (float64, bool) {
+	//计算卖掉的doge和获得的usdt
+	var calcDelta = func(dogeDelta float64, usdtBalance decimal.Decimal, initialUSDT decimal.Decimal) (float64, float64) {
 		//还没有卖出
 		if dogeDelta >= 0 {
-			return 0, false
+			return 0, 0
 		}
 
 		//当前挂单中最小的卖单价
 		var minSellPrice = decimal.Zero
-		var partiallyFilled bool
+		//var partiallyFilled bool
 		for _, order := range openOrders {
 			var price, _ = decimal.NewFromString(order.Price)
 			if order.Side == binance.SideTypeSell && (minSellPrice == decimal.Zero || price.Cmp(minSellPrice) < 0) {
 				minSellPrice = price
 			}
-			if order.Side == binance.SideTypeSell && order.Status == binance.OrderStatusTypePartiallyFilled {
-				partiallyFilled = true
-			}
+			//if order.Side == binance.SideTypeSell && order.Status == binance.OrderStatusTypePartiallyFilled {
+			//	partiallyFilled = true
+			//}
 		}
 
 		var totalUSDT decimal.Decimal
 		var totalDoge decimal.Decimal
+		//已成交
 		for i, sellPrice := range initSellPrice {
-			if minSellPrice.Cmp(decimal.Zero) == 0 {
+			if minSellPrice.Cmp(decimal.Zero) == 0 { //全卖掉了
 				totalUSDT = totalUSDT.Add(sellPrice.Mul(initSellQty[i]))
 				totalDoge = totalDoge.Add(initSellQty[i])
 			} else if minSellPrice.Cmp(decimal.Zero) > 0 && sellPrice.Cmp(minSellPrice) < 0 {
@@ -371,26 +372,44 @@ func placeBuy(haveNewSell bool, openSells, openBuys int) {
 				totalDoge = totalDoge.Add(initSellQty[i])
 			}
 		}
+		//部分成交
+		for _, order := range openOrders {
+			if order.Side == binance.SideTypeSell && order.Status == binance.OrderStatusTypePartiallyFilled {
+				usdt1, _ := decimal.NewFromString(order.CummulativeQuoteQuantity)
+				doge1, _ := decimal.NewFromString(order.ExecutedQuantity)
+				totalUSDT = totalUSDT.Add(usdt1)
+				totalDoge = totalDoge.Add(doge1)
+			}
+		}
 		log.Logger.Debugf("[placeBuy] calcSell: %s DOGE, %s FDUSD", totalDoge.String(), totalUSDT.String())
 
-		if partiallyFilled == true {
-			var curUsdt, _ = usdtBalance.Float64()
-			var initUsdt, _ = initialUSDT.Float64()
-			return curUsdt - initUsdt, true
+		//if partiallyFilled == true {
+		//	var curUsdt, _ = usdtBalance.Float64()
+		//	var initUsdt, _ = initialUSDT.Float64()
+		//	return curUsdt - initUsdt, true
+		//} else {
+		//两者取小
+		if totalUSDT.Cmp(usdtBalance) > 0 {
+			tDoge, _ := totalDoge.Float64()
+			tUsdt, _ := usdtBalance.Float64()
+			return -tDoge, tUsdt
 		} else {
-			//两者取小
-			if totalUSDT.Cmp(usdtBalance) > 0 {
-				return usdtBalance.Float64()
-			} else {
-				return totalUSDT.Float64()
-			}
+			tDoge, _ := totalDoge.Float64()
+			tUsdt, _ := totalUSDT.Float64()
+			return -tDoge, tUsdt
 		}
 	}
 
 	dogeDelta, _ := currentDOGE.Sub(runInitialDOGE).Float64()
 	//usdtDelta, _ := currentUSDT.Sub(runInitialUSDT).Float64()
-	usdtDelta, _ := calcUsdtDelta(dogeDelta, currentUSDT, runInitialUSDT)
-	log.Logger.Debugf("[placeBuy] dogeDelta: %v, usdtDelta: %v buyOrderId: %v", dogeDelta, usdtDelta, buyOrderId)
+	dogeDeltaNew, usdtDelta := calcDelta(dogeDelta, currentUSDT, runInitialUSDT)
+	if dogeDeltaNew != dogeDelta {
+		message.SendDingTalkRobit(true, robot, "doge2_every_checkdoge_"+symbol,
+			fmt.Sprintf("%v", time.Now().Unix()/(10*60)),
+			fmt.Sprintf("两种计算结束不一致(dogeDelta: %v,dogeDeltaNew: %v)", dogeDelta, dogeDeltaNew))
+	}
+	log.Logger.Debugf("[placeBuy] dogeDelta:%v, dogeDeltaNew: %v, usdtDelta: %v buyOrderId: %v", dogeDelta, dogeDeltaNew, usdtDelta, buyOrderId)
+
 	//doge为负，表示已有卖单成交，开始挂买单
 	if dogeDelta < 0 {
 		if usdtDelta <= 0 {
