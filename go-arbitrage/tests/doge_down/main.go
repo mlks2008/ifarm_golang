@@ -43,8 +43,9 @@ var (
 )
 
 var (
+	gitHash                 string
 	Filed_BuyOrderId        string = "buyorderid"
-	Filed_EachRoundTime            = "eachroundtime"
+	Filed_EachRoundTime            = "eachroundtime" //每轮值不同,redisKey的一部分：用于到redis中检测该价格是否已经挂过卖单
 	Filed_PlaceSellLastTime string = "placeSellLastTime"
 )
 
@@ -89,8 +90,6 @@ func main() {
 
 	log.InitLogger("./", "testDoge", true)
 
-	log.Logger.Debugf("robot:%v,maxSellOrders:%v", robot, maxSellOrders)
-
 	client = binance.NewClient(apiKey, secretKey)
 
 	err := initSellOrders(false)
@@ -101,14 +100,14 @@ func main() {
 		return
 	}
 
-	//加载buyorderid
+	//加载买入buyorderid
 	buyOrderId = RunGetInt64(robot, symbol, Filed_BuyOrderId)
+	//加载最近卖出时间
 	placeSellLastTime = RunGetInt64(robot, symbol, Filed_PlaceSellLastTime)
 	log.Logger.Debugf("Load buyOrderId: %v, placeSellLastTime: %v", buyOrderId, placeSellLastTime)
 
 	initialUSDT, initialDOGE, _ := RunGetDogeCost(robot, symbol)
 	log.Logger.Debugf("Initial balances: %s DOGE, %s FDUSD", initialDOGE.String(), initialUSDT.String())
-	//初始投入值
 	RunGetDogeCost(robot, symbol+"-INIT")
 
 	currentDOGE, currentUSDT, stopBalance, err := getBalances()
@@ -117,7 +116,11 @@ func main() {
 	}
 	checkStopByBalance(currentUSDT.String(), currentDOGE.String(), stopBalance)
 
+	log.Logger.Debugf("Robot:%v, maxSellOrders:%v, gitHash:%v, stopByBalance:%v", robot, maxSellOrders, gitHash, stopByBalance)
+
 	go checkFinish()
+
+	go checkBalanceStop()
 
 	for {
 		if checkFee() {
@@ -144,6 +147,124 @@ func checkFee() bool {
 		return false
 	}
 	return true
+}
+
+func checkFinish() {
+	var profitTimes int
+	for {
+		time.Sleep(time.Second * 3)
+		openOrders, err := openOrders()
+		if err != nil {
+			stop = false
+			log.Logger.Error(err)
+			continue
+		}
+
+		if buyOrderId > 0 {
+			orderstatus, qty, err := getOrderStatus(symbol, buyOrderId)
+			if err != nil {
+				log.Logger.Errorf("[checkFinish] getOrderStatus %v %v", buyOrderId, err)
+				continue
+			}
+			if orderstatus == true {
+				stop = true
+				time.Sleep(time.Second)
+				//重新最新余额
+				currentDOGE, currentUSDT, _, err := getBalances()
+				if err != nil {
+					continue
+				}
+
+				//最近一次买成功时间
+				buySuccLastTime = time.Now().Unix()
+
+				//套利通知
+				{
+					//计算本次套利
+					runUSDT, runDOGE, _ := RunGetDogeCost(robot, symbol)
+					dogeDelta, _ := currentDOGE.Sub(runDOGE).Float64()
+					usdtDelta, _ := currentUSDT.Sub(runUSDT).Float64()
+					//计算累计套利
+					initUSDT, initDOGE, initTime := RunGetDogeCost(robot, symbol+"-INIT")
+					totalDogeDelta, _ := currentDOGE.Sub(initDOGE).Float64()
+					totalUsdtDelta, _ := currentUSDT.Sub(initUSDT).Float64()
+
+					//说明又有卖单成交了，这次套利还要继续(要扣除回撤部分)
+					if dogeDelta < float64(0-returnProfitDoge) {
+						stop = false
+						msg := fmt.Sprintf("发生了买单已成交，但关闭前又有卖单成交，继续交易(dogeDelta：%v)...", dogeDelta)
+						log.Logger.Error(msg)
+						message.SendDingTalkRobit(true, robot, "doge2_every_continue_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/3600), msg)
+						continue
+					}
+
+					profitTimes++
+					price, _ := getCurrentPrice()
+
+					logmsg := fmt.Sprintf("E... %v 交易量:%v 套利:%vdoge(%vusdt) 总套利:%vdoge(%vusdt) \n套利次数:%v 余额:%vdoge(%vusdt) 当前价格:%v",
+						symbol, qty, dogeDelta, usdtDelta, totalDogeDelta, totalUsdtDelta,
+						profitTimes, currentDOGE.String(), currentUSDT.String(), price)
+					log.Logger.Debugf("[checkFinish] profit: %v", logmsg)
+					message.SendDingTalkRobit(true, robot, "doge2_every_profit_"+symbol, fmt.Sprintf("%v", time.Now().Unix()), logmsg)
+
+					//保存套利后最新余额,重置初始投入值
+					dogeBalanceSaveFile(initTime, currentUSDT.String(), currentDOGE.String())
+
+					//余额保存到redis,后面做邮件报表使用
+					dogeBalanceSaveRedis(currentDOGE.String())
+				}
+
+				time.Sleep(time.Second * 5)
+
+				//重新铺单
+				cancelOrders(binance.SideTypeSell, symbol, openOrders)
+				initSellOrders(true)
+				placeSellLastTime = time.Now().Unix()
+				RunSetInt64(robot, symbol, Filed_PlaceSellLastTime, placeSellLastTime)
+				buyOrderId = 0
+				RunSetInt64(robot, symbol, Filed_BuyOrderId, 0)
+				stop = false
+			}
+		} else {
+			if stopByBalance == true {
+				continue
+			}
+			//本轮长时间没成交
+			if buyOrderId == 0 && placeSellLastTime > 0 && time.Now().Unix()-placeSellLastTime > 10*60 {
+				curPrice, err := getCurrentPrice()
+				if err != nil {
+					log.Logger.Error("[placeSells] Error getCurrentPrice:", err)
+					continue
+				}
+				initPrice, err := RunGetInitPrice(robot, symbol)
+				if err != nil {
+					log.Logger.Error(err)
+					continue
+				}
+				//当前价格小于当时铺单价格，说明是下跌导致的未成交需要重新铺单(如果当前价格比当时铺单价格还高仍未成交，说明价格太稳定不需要重新铺单）
+				if curPrice < initPrice {
+					stop = true
+					cancelOrders(binance.SideTypeSell, symbol, openOrders)
+					initSellOrders(true)
+					placeSellLastTime = time.Now().Unix()
+					RunSetInt64(robot, symbol, Filed_PlaceSellLastTime, placeSellLastTime)
+					stop = false
+				}
+			}
+		}
+	}
+}
+
+func checkBalanceStop() {
+	for {
+		time.Sleep(time.Second * 2)
+		currentDOGE, currentUSDT, stopBalance, err := getBalances()
+		if err != nil {
+			log.Logger.Errorf("getBalances", err)
+			continue
+		}
+		checkStopByBalance(currentUSDT.String(), currentDOGE.String(), stopBalance)
+	}
 }
 
 func initSellOrders(init bool) error {
@@ -208,22 +329,21 @@ func initSellOrders(init bool) error {
 	return nil
 }
 
-// 挂卖
 // 否：如果有成交卖单，定时会把成交卖单在补上 --> 容易占用大量资金，一直上涨亏损过大
 func placeSells() (bool, int, int) {
 	if stop == true || stopByBalance == true {
 		return false, -1, -1
 	}
 
-	//当价格小于0.09时自动暂停
 	price, err := RunGetInitPrice(robot, symbol)
 	if err != nil {
 		log.Logger.Error(err)
 		return false, -1, -1
 	}
-	if price < 0.09 {
-		RunSetInitPrice(robot, symbol, 0)
-		message.SendDingTalkRobit(true, robot, "doge2_every_autostop_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/(60*60*12)), fmt.Sprintf("因价格小于0.09，将不挂单:%v", price))
+	//当价格小于0.09时自动暂停
+	if price <= 0.09 {
+		initSellOrders(true)
+		message.SendDingTalkRobit(true, robot, "doge2_every_autostop_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/(60*60*12)), fmt.Sprintf("因价格小于等于0.09，将不挂单:%v", price))
 		return false, -1, -1
 	}
 
@@ -299,7 +419,7 @@ func placeSells() (bool, int, int) {
 
 	//超时没有成交了
 	var timeout = (time.Now().Unix() - placeSellLastTime) / (3600 * 4)
-	if placeSellLastTime > 0 && timeout >= 1 {
+	if placeSellLastTime > 0 && timeout > 1 {
 		message.SendDingTalkRobit(true, robot, "doge2_every_sell_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/(3600*4)), fmt.Sprintf("超过%v小时没有新卖单", timeout*4))
 	}
 	return haveNewSell, openSells, openBuys
@@ -311,7 +431,7 @@ func placeBuy(haveNewSell bool, openSells, openBuys int) {
 	}
 	//没有产生新卖单情况
 	if haveNewSell == false {
-		//placeSells()发生了异常
+		//placeSells()发生了异常 或 价格过小自动暂停了
 		if openSells == -1 && openBuys == -1 {
 			return
 		}
@@ -341,11 +461,11 @@ func placeBuy(haveNewSell bool, openSells, openBuys int) {
 		return
 	}
 	//计算卖掉的doge和获得的usdt
-	var calcDelta = func(dogeDelta float64, usdtBalance decimal.Decimal, initialUSDT decimal.Decimal) (float64, float64) {
-		//还没有卖出
-		if dogeDelta >= 0 {
-			return 0, 0
-		}
+	var calcDelta = func(dogeDeltaOld float64, usdtBalance decimal.Decimal, initialUSDT decimal.Decimal) (float64, float64) {
+		////还没有卖出或没有挂单
+		//if dogeDeltaOld >= 0 {
+		//	return 0, 0
+		//}
 
 		//当前挂单中最小的卖单价
 		var minSellPrice = decimal.Zero
@@ -472,163 +592,66 @@ func placeBuy(haveNewSell bool, openSells, openBuys int) {
 	}
 }
 
-func checkFinish() {
-	var profitTimes int
-	for {
-		time.Sleep(time.Second * 5)
-		currentDOGE, currentUSDT, stopBalance, err := getBalances()
-		if err != nil {
-			log.Logger.Errorf("getBalances", err)
-			continue
-		}
-		checkStopByBalance(currentUSDT.String(), currentDOGE.String(), stopBalance)
-
-		time.Sleep(time.Second * 5)
-		openOrders, err := openOrders()
-		if err != nil {
-			stop = false
-			log.Logger.Error(err)
-			continue
-		}
-
-		if buyOrderId > 0 {
-			orderstatus, qty, err := getOrderStatus(symbol, buyOrderId)
-			if err != nil {
-				log.Logger.Errorf("[checkFinish] getOrderStatus %v %v", buyOrderId, err)
-				continue
-			}
-			if orderstatus == true {
-				stop = true
-				time.Sleep(time.Second)
-				//重新最新余额
-				currentDOGE, currentUSDT, _, err = getBalances()
-				if err != nil {
-					continue
-				}
-
-				//最近一次买成功时间
-				buySuccLastTime = time.Now().Unix()
-
-				//套利通知
-				{
-					_, runDOGE, _ := RunGetDogeCost(robot, symbol)
-					initUSDT, initDOGE, initTime := RunGetDogeCost(robot, symbol+"-INIT")
-
-					dogeDelta, _ := currentDOGE.Sub(runDOGE).Float64()
-					//说明又有卖单成交了，这次套利还要继续(要扣除回撤部分)
-					if dogeDelta < float64(0-returnProfitDoge) {
-						stop = false
-						msg := fmt.Sprintf("发生了买单已成交，但关闭前又有卖单成交，继续交易(dogeDelta：%v)...", dogeDelta)
-						log.Logger.Error(msg)
-						message.SendDingTalkRobit(true, robot, "doge2_every_continue_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/3600), msg)
-						continue
-					}
-
-					profitTimes++
-
-					totalDogeDelta, _ := currentDOGE.Sub(initDOGE).Float64()
-					totalUsdtDelta, _ := currentUSDT.Sub(initUSDT).Float64()
-
-					price, _ := getCurrentPrice()
-
-					logmsg := fmt.Sprintf("E... %v 交易量:%v 套利:%vdoge 总套利:%vdoge(chanU:%v) \n套利次数:%v 余额:%vdoge(chanU:%v) 当前价格:%v",
-						symbol, qty, dogeDelta, totalDogeDelta, totalUsdtDelta,
-						profitTimes, currentDOGE.String(), currentUSDT.String(), price)
-					log.Logger.Debugf("[checkFinish] profit: %v", logmsg)
-					message.SendDingTalkRobit(true, robot, "doge2_every_profit_"+symbol, fmt.Sprintf("%v", time.Now().Unix()), logmsg)
-
-					//保存当前余额,重置初始投入值
-					dogeBalanceSaveFile(initTime, currentUSDT.String(), currentDOGE.String())
-
-					//每天余额保存到redis,后面做邮件报表使用
-					dogeBalanceSaveRedis(currentDOGE.String())
-				}
-
-				time.Sleep(time.Second * 5)
-
-				//重新铺单
-				cancelOrders(binance.SideTypeSell, openOrders)
-				initSellOrders(true)
-				placeSellLastTime = time.Now().Unix()
-				RunSetInt64(robot, symbol, Filed_PlaceSellLastTime, placeSellLastTime)
-				buyOrderId = 0
-				RunSetInt64(robot, symbol, Filed_BuyOrderId, 0)
-				stop = false
-
-				continue
-			} else {
-				////运行中卖单长时间没有成交
-				//if buyOrderId > 0 && placeSellLastTime > 0 && time.Now().Unix()-placeSellLastTime > 30*60 {
-				//	stop = true
-				//	cancelOrders(binance.SideTypeSell, openOrders)
-				//	initSellOrders(false)
-				//	placeSellLastTime = time.Now().Unix()
-				//	stop = false
-				//}
-			}
-		} else {
-			if stopByBalance == true {
-				continue
-			}
-			//本轮长时间没成交
-			if buyOrderId == 0 && placeSellLastTime > 0 && time.Now().Unix()-placeSellLastTime > 10*60 {
-				curPrice, err := getCurrentPrice()
-				if err != nil {
-					log.Logger.Error("[placeSells] Error getCurrentPrice:", err)
-					continue
-				}
-				initPrice, err := RunGetInitPrice(robot, symbol)
-				if err != nil {
-					log.Logger.Error(err)
-					continue
-				}
-				//当前价格小于当时铺单价格，说明是下跌导致的未成交需要重新铺单(如果当前价格比当时铺单价格还高仍未成交，说明价格太稳定不需要重新铺单）
-				if curPrice < initPrice {
-					stop = true
-					cancelOrders(binance.SideTypeSell, openOrders)
-					initSellOrders(true)
-					placeSellLastTime = time.Now().Unix()
-					RunSetInt64(robot, symbol, Filed_PlaceSellLastTime, placeSellLastTime)
-					stop = false
-				}
-			}
-		}
-	}
-}
-
-// stopBalance:0时暂停服务，其它值恢复(0.001时恢复前重置所有，相当于重新所有files后重启服务)
+// stopBalance: 0暂停服务，其它值恢复
 func checkStopByBalance(currentUSDT, currentDOGE string, stopBalance decimal.Decimal) {
 	if stopByBalance == false && stopBalance.Cmp(decimal.NewFromFloat(0)) == 0 {
+		//确认是否结束
+		if buyOrderId > 0 {
+			message.SendDingTalkRobit(true, robot, "doge2_every_stop1_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/(3600*4)), "待本轮结束后暂停...")
+			orderstatus, _, err := getOrderStatus(symbol, buyOrderId)
+			if err != nil {
+				log.Logger.Errorf("[checkStopByBalance] getOrderStatus %v %v", buyOrderId, err)
+				return
+			}
+			//还未结束
+			if orderstatus == false {
+				return
+			}
+		}
+
+		//已经结束，可以暂停
 		stopByBalance = true
-		message.SendDingTalkRobit(true, robot, "doge2_every_stop_"+symbol, fmt.Sprintf("%v", time.Now().Unix()), "已暂停")
-	}
-
-	if stopByBalance == true && stopBalance.Cmp(decimal.NewFromFloat(0)) != 0 {
-		//0.001表示要重置初始成本
-		if stopBalance.Cmp(decimal.NewFromFloat(0.001)) == 0 {
-			RunSetDogeCost(robot, symbol, currentUSDT, currentDOGE)
-
+		for {
+			//取消可能存在的未成交卖挂单
 			openOrders, err := openOrders()
 			if err != nil {
 				log.Logger.Error(err)
-				return
+				time.Sleep(time.Second * 5)
+				continue
 			}
-			cancelOrders(binance.SideTypeSell, openOrders)
-			initSellOrders(true)
-			placeSellLastTime = time.Now().Unix()
-			buySuccLastTime = 0
-			RunSetInt64(robot, symbol, Filed_PlaceSellLastTime, placeSellLastTime)
+			cancelOrders(binance.SideTypeSell, symbol, openOrders)
+			break
 		}
+		message.SendDingTalkRobit(true, robot, "doge2_every_stop2_"+symbol, fmt.Sprintf("%v", time.Now().Unix()), "已暂停")
+	}
+
+	if stopByBalance == true && stopBalance.Cmp(decimal.NewFromFloat(0)) != 0 {
+		RunSetDogeCost(robot, symbol, currentUSDT, currentDOGE)
+		for {
+			//取消可能存在的未成交卖挂单
+			openOrders, err := openOrders()
+			if err != nil {
+				log.Logger.Error(err)
+				time.Sleep(time.Second * 5)
+				continue
+			}
+			cancelOrders(binance.SideTypeSell, symbol, openOrders)
+			break
+		}
+		initSellOrders(true)
+		placeSellLastTime = time.Now().Unix()
+		RunSetInt64(robot, symbol, Filed_PlaceSellLastTime, placeSellLastTime)
+
+		//重置回来后重新计算，避免执行回撤
+		buySuccLastTime = 0
 
 		stopByBalance = false
+
 		message.SendDingTalkRobit(true, robot, "doge2_every_start_"+symbol, fmt.Sprintf("%v", time.Now().Unix()), "已恢复")
 	}
 }
 
 func dogeBalanceSaveFile(initTime int64, currentUSDT, currentDOGE string) {
-	////todo usdt始终按0算
-	//currentUSDT = "0"
-
 	//保存当前余额
 	log.Logger.Debugf("[checkFinish] Initial balances: %s DOGE, %s FDUSD", currentDOGE, currentUSDT)
 	RunSetDogeCost(robot, symbol, currentUSDT, currentDOGE)

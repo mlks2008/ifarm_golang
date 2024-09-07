@@ -44,8 +44,11 @@ func openOrders() ([]*binance.Order, error) {
 	return openOrders, nil
 }
 
-func cancelOrders(tye binance.SideType, openOrders []*binance.Order) {
+func cancelOrders(tye binance.SideType, symbol string, openOrders []*binance.Order) {
 	for _, order := range openOrders {
+		if order.Symbol != symbol {
+			continue
+		}
 		if tye == "all" || order.Side == tye {
 			_, err := client.NewCancelOrderService().
 				Symbol(symbol).
@@ -135,8 +138,6 @@ func RunGetDogeCost(robot, symbol string) (decimal.Decimal, decimal.Decimal, int
 		}
 		RunSetDogeCost(robot, symbol, currentUSDT.String(), currentDOGE.String())
 		return currentUSDT, currentDOGE, time.Now().Unix()
-		//RunSetUsdtCost(symbol, "0", "1772424")
-		//return decimal.Zero, decimal.NewFromFloat(1772424) //1778380
 	} else {
 		v := strings.Split(cost, ",")
 		costQuote, _ := decimal.NewFromString(v[0])

@@ -6,7 +6,7 @@ export GOOS=linux
 export CGO_ENABLED=0
 export GOROOT=/usr/local/go
 go mod tidy
-go build -o doge
+go build -ldflags "-X 'main.gitHash=$(git show -s --format=%H)'" -o doge
 
 COPYFILE_DISABLE=1 tar --no-xattrs -zcvf doge.bin mainapi-restart.sh mainapi-stop.sh oneplat-restart.sh oneplat-stop.sh doge
 rm -rf doge
