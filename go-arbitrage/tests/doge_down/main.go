@@ -335,16 +335,19 @@ func placeSells() (bool, int, int) {
 		return false, -1, -1
 	}
 
-	price, err := RunGetInitPrice(robot, symbol)
-	if err != nil {
-		log.Logger.Error(err)
-		return false, -1, -1
-	}
-	//当价格小于0.09时自动暂停
-	if price <= 0.09 {
-		initSellOrders(true)
-		message.SendDingTalkRobit(true, robot, "doge2_every_autostop_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/(60*60*12)), fmt.Sprintf("因价格小于等于0.09，将不挂单:%v", price))
-		return false, -1, -1
+	//没轮开始前检测，已经在进行中不需要检测
+	if buyOrderId == 0 {
+		price, err := RunGetInitPrice(robot, symbol)
+		if err != nil {
+			log.Logger.Error(err)
+			return false, -1, -1
+		}
+		//当价格小于0.09时自动暂停
+		if price <= 0.093 {
+			initSellOrders(true)
+			message.SendDingTalkRobit(true, robot, "doge2_every_autostop_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/(60*60*12)), fmt.Sprintf("因价格小于等于0.09，将不挂单:%v", price))
+			return false, -1, -1
+		}
 	}
 
 	openOrders, err := openOrders()
@@ -418,9 +421,9 @@ func placeSells() (bool, int, int) {
 	}
 
 	//超时没有成交了
-	var timeout = (time.Now().Unix() - placeSellLastTime) / (3600 * 4)
+	var timeout = (time.Now().Unix() - placeSellLastTime) / (3600 * 8)
 	if placeSellLastTime > 0 && timeout > 1 {
-		message.SendDingTalkRobit(true, robot, "doge2_every_sell_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/(3600*4)), fmt.Sprintf("超过%v小时没有新卖单", timeout*4))
+		message.SendDingTalkRobit(true, robot, "doge2_every_sell_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/(3600*8)), fmt.Sprintf("超过%v小时没有新卖单", timeout*8))
 	}
 	return haveNewSell, openSells, openBuys
 }
@@ -501,7 +504,7 @@ func placeBuy(haveNewSell bool, openSells, openBuys int) {
 				totalDoge = totalDoge.Add(doge1)
 			}
 		}
-		log.Logger.Debugf("[placeBuy] calcSell: %s DOGE, %s FDUSD", totalDoge.String(), totalUSDT.String())
+		log.Logger.Debugf("[placeBuy] calcSell: %s DOGE, %s FDUSD, minSellPrice: %v", totalDoge.String(), totalUSDT.String(), minSellPrice)
 
 		//if partiallyFilled == true {
 		//	var curUsdt, _ = usdtBalance.Float64()
@@ -597,7 +600,7 @@ func checkStopByBalance(currentUSDT, currentDOGE string, stopBalance decimal.Dec
 	if stopByBalance == false && stopBalance.Cmp(decimal.NewFromFloat(0)) == 0 {
 		//确认是否结束
 		if buyOrderId > 0 {
-			message.SendDingTalkRobit(true, robot, "doge2_every_stop1_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/(3600*4)), "待本轮结束后暂停...")
+			message.SendDingTalkRobit(true, robot, "doge2_every_stop1_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/(3600*8)), "待本轮结束后暂停...")
 			orderstatus, _, err := getOrderStatus(symbol, buyOrderId)
 			if err != nil {
 				log.Logger.Errorf("[checkStopByBalance] getOrderStatus %v %v", buyOrderId, err)
