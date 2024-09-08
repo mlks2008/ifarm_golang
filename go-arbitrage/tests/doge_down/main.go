@@ -482,7 +482,7 @@ func placeBuy(haveNewSell bool, openSells, openBuys int) {
 		var totalDoge decimal.Decimal
 		//已成交
 		for i, sellPrice := range initSellPrice {
-			if minSellPrice.Cmp(decimal.Zero) == 0 { //全卖掉了
+			if buyOrderId > 0 && minSellPrice.Cmp(decimal.Zero) == 0 { //全卖掉了
 				totalUSDT = totalUSDT.Add(sellPrice.Mul(initSellQty[i]))
 				totalDoge = totalDoge.Add(initSellQty[i])
 			} else if minSellPrice.Cmp(decimal.Zero) > 0 && sellPrice.Cmp(minSellPrice) < 0 {
