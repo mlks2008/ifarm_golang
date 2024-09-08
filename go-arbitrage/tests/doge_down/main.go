@@ -257,7 +257,7 @@ func checkFinish() {
 
 func checkBalanceStop() {
 	for {
-		time.Sleep(time.Second * 2)
+		time.Sleep(time.Second * 6)
 		currentDOGE, currentUSDT, stopBalance, err := getBalances()
 		if err != nil {
 			log.Logger.Errorf("getBalances", err)
