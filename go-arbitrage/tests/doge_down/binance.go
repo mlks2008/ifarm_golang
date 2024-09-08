@@ -117,7 +117,7 @@ func getBalances() (decimal.Decimal, decimal.Decimal, decimal.Decimal, error) {
 			b1, _ := decimal.NewFromString(b.Free)
 			b2, _ := decimal.NewFromString(b.Locked)
 			fdusdBalance = b1.Add(b2)
-		} else if b.Asset == "LUNC" {
+		} else if b.Asset == "CRV" {
 			b1, _ := decimal.NewFromString(b.Free)
 			b2, _ := decimal.NewFromString(b.Locked)
 			stopBalance = b1.Add(b2)

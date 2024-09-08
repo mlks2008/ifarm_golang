@@ -51,7 +51,7 @@ var (
 
 var client *binance.Client
 
-var stopByBalance bool //LUNC:0时暂停服务，其它值恢复(0.001时恢复前重置所有，相当于重新所有files后重启服务)
+var stopByBalance bool //CRV:0时暂停服务，其它值恢复
 var stop bool          //暂停买卖挂单
 
 var buyOrderId int64        //当前买单orderId
@@ -120,10 +120,17 @@ func main() {
 
 	go checkFinish()
 
-	go checkBalanceStop()
-
 	for {
 		if checkFee() {
+			//每轮开始前检测是否已经暂停
+			currentDOGE, currentUSDT, stopBalance, err := getBalances()
+			if err != nil {
+				log.Logger.Errorf("getBalances", err)
+				time.Sleep(time.Second * 20)
+				continue
+			}
+			checkStopByBalance(currentUSDT.String(), currentDOGE.String(), stopBalance)
+
 			haveNewSell, openSells, openBuys := placeSells()
 			time.Sleep(time.Second * 20)
 			placeBuy(haveNewSell, openSells, openBuys)
@@ -152,7 +159,7 @@ func checkFee() bool {
 func checkFinish() {
 	var profitTimes int
 	for {
-		time.Sleep(time.Second * 3)
+		time.Sleep(time.Second * 5)
 		openOrders, err := openOrders()
 		if err != nil {
 			stop = false
@@ -255,18 +262,6 @@ func checkFinish() {
 	}
 }
 
-func checkBalanceStop() {
-	for {
-		time.Sleep(time.Second * 6)
-		currentDOGE, currentUSDT, stopBalance, err := getBalances()
-		if err != nil {
-			log.Logger.Errorf("getBalances", err)
-			continue
-		}
-		checkStopByBalance(currentUSDT.String(), currentDOGE.String(), stopBalance)
-	}
-}
-
 func initSellOrders(init bool) error {
 	if init {
 		RunSetInitPrice(robot, symbol, 0)
@@ -345,7 +340,7 @@ func placeSells() (bool, int, int) {
 		//当价格小于0.09时自动暂停
 		if price <= 0.093 {
 			initSellOrders(true)
-			message.SendDingTalkRobit(true, robot, "doge2_every_autostop_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/(60*60*12)), fmt.Sprintf("因价格小于等于0.09，将不挂单:%v", price))
+			message.SendDingTalkRobit(true, robot, "doge2_every_autostop_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/(60*60*12)), fmt.Sprintf("因价格小于等于0.093，将不挂单:%v", price))
 			return false, -1, -1
 		}
 	}
