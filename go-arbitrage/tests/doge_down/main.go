@@ -28,8 +28,9 @@ var (
 	priceFactor   = 1.35  //Safety order间隔倍数
 	profitFactor  = 0.003 //Target profit
 
-	maxSellOrders    = 8 //最大订单数
-	actionSellOrders = 3 //活跃订单数
+	minAllowPrice    = 0.1 //最小允许价格（小于此值不在执行）
+	maxSellOrders    = 8   //最大订单数
+	actionSellOrders = 3   //活跃订单数
 	// mainapi
 	//apiKey           = "mCXfycRaEiffizOajnB1VsVxytyUFnaA1tK4eX8QyuM8G565Weq5s4QXoyhkzwdE"
 	//secretKey        = "wvRdYxo9O4IeBywbDCZgGhflwDwv2ERUbdQHUgoZ8JXTpUDGvFsTnXtzQOHxL9XW"
@@ -67,6 +68,7 @@ var (
 
 func init() {
 	flag.StringVar(&robot, "robot", "", "eg: -robot oneplat/mainapi")
+	flag.Float64Var(&minAllowPrice, "minAllowPrice", minAllowPrice, "")
 	flag.IntVar(&maxSellOrders, "maxSellOrders", maxSellOrders, "")
 	flag.Parse()
 
@@ -116,7 +118,7 @@ func main() {
 	}
 	checkStopByBalance(currentUSDT.String(), currentDOGE.String(), stopBalance)
 
-	log.Logger.Debugf("Robot:%v, maxSellOrders:%v, gitHash:%v, stopByBalance:%v", robot, maxSellOrders, gitHash, stopByBalance)
+	log.Logger.Debugf("Robot:%v, minAllowPrice:%v, maxSellOrders:%v, gitHash:%v, stopByBalance:%v", robot, minAllowPrice, maxSellOrders, gitHash, stopByBalance)
 
 	go checkFinish()
 
@@ -337,10 +339,10 @@ func placeSells() (bool, int, int) {
 			log.Logger.Error(err)
 			return false, -1, -1
 		}
-		//当价格小于0.09时自动暂停
-		if price <= 0.093 {
+		//当价格小于此值时自动暂停
+		if price < minAllowPrice {
 			initSellOrders(true)
-			message.SendDingTalkRobit(true, robot, "doge2_every_autostop_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/(60*60*12)), fmt.Sprintf("因价格小于等于0.093，将不挂单:%v", price))
+			message.SendDingTalkRobit(true, robot, "doge2_every_autostop_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/(60*60*12)), fmt.Sprintf("因价格小于等于%v，将不挂单:%v", minAllowPrice, price))
 			return false, -1, -1
 		}
 	}
@@ -523,7 +525,7 @@ func placeBuy(haveNewSell bool, openSells, openBuys int) {
 	dogeDeltaNew, usdtDelta := calcDelta(dogeDelta, currentUSDT, runInitialUSDT)
 	if dogeDeltaNew != dogeDelta {
 		message.SendDingTalkRobit(true, robot, "doge2_every_checkdoge_"+symbol,
-			fmt.Sprintf("%v", time.Now().Unix()/(10*60)),
+			fmt.Sprintf("%v", time.Now().Unix()/(8*60*60)),
 			fmt.Sprintf("两种计算结束不一致(dogeDelta: %v,dogeDeltaNew: %v)", dogeDelta, dogeDeltaNew))
 	}
 	log.Logger.Debugf("[placeBuy] dogeDelta:%v, dogeDeltaNew: %v, usdtDelta: %v buyOrderId: %v", dogeDelta, dogeDeltaNew, usdtDelta, buyOrderId)
