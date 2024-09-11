@@ -342,7 +342,7 @@ func placeSells() (bool, int, int) {
 		//当价格小于此值时自动暂停
 		if price < minAllowPrice {
 			initSellOrders(true)
-			message.SendDingTalkRobit(true, robot, "doge2_every_autostop_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/(60*60*12)), fmt.Sprintf("因价格小于等于%v，将不挂单:%v", minAllowPrice, price))
+			message.SendDingTalkRobit(true, robot, "doge2_every_autostop_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/(60*60*12)), fmt.Sprintf("当前价格%v小于%v，不挂单。", price, minAllowPrice))
 			return false, -1, -1
 		}
 	}

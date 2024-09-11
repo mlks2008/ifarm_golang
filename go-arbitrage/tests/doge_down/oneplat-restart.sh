@@ -4,4 +4,4 @@ tar -zxvf doge.bin
 
 rm -rf doge.bin
 
-nohup ./doge -robot=oneplat -minAllowPrice=0.1 -maxSellOrders=6 > log.oneplat &
+nohup ./doge -robot=oneplat -minAllowPrice=0.095 -maxSellOrders=8 > log.oneplat &
