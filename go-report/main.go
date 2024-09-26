@@ -17,7 +17,7 @@ func main() {
 	log.InitLogger("./", "goreport", true)
 
 	//report300U()
-	reportDogeDown_oneplat()
+	//reportDogeDown_oneplat()
 	reportDogeDown_mainapi()
 
 	c := cron.New(cron.WithSeconds())
