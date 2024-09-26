@@ -4,4 +4,4 @@ tar -zxvf doge.bin
 
 rm -rf doge.bin
 
-nohup ./doge -robot=mainapi -minAllowPrice=0.103 -maxSellOrders=7 > log.mainapi &
+nohup ./doge -robot=mainapi -minAllowPrice=0.106 -maxSellOrders=7 > log.mainapi &

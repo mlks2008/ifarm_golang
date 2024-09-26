@@ -445,6 +445,19 @@ func placeBuy(haveNewSell bool, openSells, openBuys int) {
 		}
 	}
 
+	openOrders, err := openOrders()
+	if err != nil {
+		log.Logger.Error("[placeBuy] Error openOrders:", err)
+		return
+	}
+
+	//如果买单已经是部分成交，不在进行重挂
+	for _, order := range openOrders {
+		if order.OrderID == buyOrderId && order.Status == binance.OrderStatusTypePartiallyFilled {
+			return
+		}
+	}
+
 	runInitialUSDT, runInitialDOGE, _ := RunGetDogeCost(robot, symbol)
 	log.Logger.Debugf("[placeBuy] Initial balances: %s DOGE, %s FDUSD", runInitialDOGE.String(), runInitialUSDT.String())
 
@@ -455,11 +468,6 @@ func placeBuy(haveNewSell bool, openSells, openBuys int) {
 	}
 	log.Logger.Debugf("[placeBuy] current balances: %s DOGE, %s FDUSD", currentDOGE.String(), currentUSDT.String())
 
-	openOrders, err := openOrders()
-	if err != nil {
-		log.Logger.Error("[placeBuy] Error openOrders:", err)
-		return
-	}
 	//计算卖掉的doge和获得的usdt
 	var calcDelta = func(dogeDeltaOld float64, usdtBalance decimal.Decimal, initialUSDT decimal.Decimal) (float64, float64) {
 		////还没有卖出或没有挂单
