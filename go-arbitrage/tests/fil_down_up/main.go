@@ -17,9 +17,11 @@ import (
 )
 
 var (
-	symbol             = "FILFDUSD"
-	firstQty           = 100.0 //首笔挂单量
-	firstPriceIncrease = 1.004 //首笔价格增长比例
+	qtyPrecision       int32 = 2
+	pricePrecision     int32 = 3
+	symbol                   = "FILFDUSD"
+	firstQty                 = 100.0 //首笔挂单量
+	firstPriceIncrease       = 1.004 //首笔价格增长比例
 
 	baseQty      = 39.0 //Safety order size
 	baseIncrease = 2.0  //Safety order大小倍数
@@ -56,7 +58,7 @@ var stopByBalance bool //CRV:0时暂停服务，其它值恢复
 var stop bool          //暂停买卖挂单
 
 var buyOrderId int64        //当前买单orderId
-var returnProfitDoge int64  //回撤数
+var returnProfitFil int64   //回撤数
 var placeBuyLastTime int64  //最近一次挂买单时间，定时检测，超过没有发生更新买单，重新计算下单
 var buySuccLastTime int64   //最近一次买单成功执行时间，挂买单时，如果发现很久没有成交，需要进行回撤处理
 var placeSellLastTime int64 //最近一次挂卖单时间，定时检测，如果发现很久时没有挂卖了，这时可能在下跌中，重新挂卖单列表
@@ -90,7 +92,7 @@ func main() {
 		panic("apikey not exist")
 	}
 
-	log.InitLogger("./", "testDoge", true)
+	log.InitLogger("./", "testFil", true)
 
 	client = binance.NewClient(apiKey, secretKey)
 
@@ -108,9 +110,9 @@ func main() {
 	placeSellLastTime = RunGetInt64(robot, symbol, Filed_PlaceSellLastTime)
 	log.Logger.Debugf("Load buyOrderId: %v, placeSellLastTime: %v", buyOrderId, placeSellLastTime)
 
-	initialUSDT, initialFIL, _ := RunGetDogeCost(robot, symbol)
+	initialUSDT, initialFIL, _ := RunGetFilCost(robot, symbol)
 	log.Logger.Debugf("Initial balances: %s FIL, %s FDUSD", initialFIL.String(), initialUSDT.String())
-	RunGetDogeCost(robot, symbol+"-INIT")
+	RunGetFilCost(robot, symbol+"-INIT")
 
 	currentFIL, currentUSDT, stopBalance, err := getBalances()
 	if err != nil {
@@ -151,7 +153,7 @@ func checkFee() bool {
 	makerfee, err := decimal.NewFromString(fees[0].MakerCommission) //挂单
 	if makerfee.Cmp(decimal.Zero) > 0 {
 		log.Logger.Errorf("makerfee:%v >0 ", fees[0].MakerCommission)
-		message.SendDingTalkRobit(true, robot, "doge2_every_fee_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/3600), "makerfee:%v >0")
+		message.SendDingTalkRobit(true, robot, "fil2_every_fee_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/3600), "makerfee:%v >0")
 		time.Sleep(time.Minute)
 		return false
 	}
@@ -190,37 +192,37 @@ func checkFinish() {
 				//套利通知
 				{
 					//计算本次套利
-					runUSDT, runFIL, _ := RunGetDogeCost(robot, symbol)
-					dogeDelta, _ := currentFIL.Sub(runFIL).Float64()
+					runUSDT, runFIL, _ := RunGetFilCost(robot, symbol)
+					filDelta, _ := currentFIL.Sub(runFIL).Float64()
 					usdtDelta, _ := currentUSDT.Sub(runUSDT).Float64()
 					//计算累计套利
-					initUSDT, initFIL, initTime := RunGetDogeCost(robot, symbol+"-INIT")
-					totalDogeDelta, _ := currentFIL.Sub(initFIL).Float64()
+					initUSDT, initFIL, initTime := RunGetFilCost(robot, symbol+"-INIT")
+					totalFilDelta, _ := currentFIL.Sub(initFIL).Float64()
 					totalUsdtDelta, _ := currentUSDT.Sub(initUSDT).Float64()
 
 					//说明又有卖单成交了，这次套利还要继续(要扣除回撤部分)
-					if dogeDelta < float64(0-returnProfitDoge) {
+					if filDelta < float64(0-returnProfitFil) {
 						stop = false
-						msg := fmt.Sprintf("发生了买单已成交，但关闭前又有卖单成交，继续交易(dogeDelta：%v)...", dogeDelta)
+						msg := fmt.Sprintf("发生了买单已成交，但关闭前又有卖单成交，继续交易(filDelta：%v)...", filDelta)
 						log.Logger.Error(msg)
-						message.SendDingTalkRobit(true, robot, "doge2_every_continue_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/3600), msg)
+						message.SendDingTalkRobit(true, robot, "fil2_every_continue_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/3600), msg)
 						continue
 					}
 
 					profitTimes++
 					price, _ := getCurrentPrice()
 
-					logmsg := fmt.Sprintf("E... %v 交易量:%v 套利:%vdoge(%vusdt) 总套利:%vdoge(%vusdt) \n套利次数:%v 余额:%vdoge(%vusdt) 当前价格:%v",
-						symbol, qty, dogeDelta, usdtDelta, totalDogeDelta, totalUsdtDelta,
+					logmsg := fmt.Sprintf("E... %v 交易量:%v 套利:%vfil(%vusdt) 总套利:%vfil(%vusdt) \n套利次数:%v 余额:%vfil(%vusdt) 当前价格:%v",
+						symbol, qty, filDelta, usdtDelta, totalFilDelta, totalUsdtDelta,
 						profitTimes, currentFIL.String(), currentUSDT.String(), price)
 					log.Logger.Debugf("[checkFinish] profit: %v", logmsg)
-					message.SendDingTalkRobit(true, robot, "doge2_every_profit_"+symbol, fmt.Sprintf("%v", time.Now().Unix()), logmsg)
+					message.SendDingTalkRobit(true, robot, "fil2_every_profit_"+symbol, fmt.Sprintf("%v", time.Now().Unix()), logmsg)
 
 					//保存套利后最新余额,重置初始投入值
-					dogeBalanceSaveFile(initTime, currentUSDT.String(), currentFIL.String())
+					filBalanceSaveFile(initTime, currentUSDT.String(), currentFIL.String())
 
 					//余额保存到redis,后面做邮件报表使用
-					dogeBalanceSaveRedis(currentFIL.String())
+					filBalanceSaveRedis(currentFIL.String())
 				}
 
 				time.Sleep(time.Second * 5)
@@ -293,19 +295,19 @@ func initSellOrders(init bool) error {
 
 	log.Logger.Debugf("[initSellOrders] Current price: %f", price)
 
-	initSellQty[0] = decimal.NewFromFloat(firstQty).Truncate(0)
+	initSellQty[0] = decimal.NewFromFloat(firstQty).Truncate(qtyPrecision)
 	initRadios[0] = decimal.NewFromFloat(firstPriceIncrease - 1)
-	initSellPrice[0] = decimal.NewFromFloat(price * math.Pow(firstPriceIncrease, 1)).Truncate(5)
+	initSellPrice[0] = decimal.NewFromFloat(price * math.Pow(firstPriceIncrease, 1)).Truncate(pricePrecision)
 	for i := 0; i < maxSellOrders; i++ {
-		qty := decimal.NewFromFloat(baseQty * math.Pow(baseIncrease, float64(i))).Truncate(0)
+		qty := decimal.NewFromFloat(baseQty * math.Pow(baseIncrease, float64(i))).Truncate(qtyPrecision)
 		initSellQty[i+1] = qty
 
 		if i == 0 {
 			initRadios[i+1] = decimal.NewFromFloat(priceIncrease - 1)
-			initSellPrice[i+1] = decimal.NewFromFloat(price * math.Pow(priceIncrease, 1)).Truncate(5)
+			initSellPrice[i+1] = decimal.NewFromFloat(price * math.Pow(priceIncrease, 1)).Truncate(pricePrecision)
 		} else {
 			initRadios[i+1] = (decimal.NewFromFloat(priceIncrease - 1)).Add(initRadios[i].Mul(decimal.NewFromFloat(priceFactor)))
-			initSellPrice[i+1] = initRadios[i+1].Add(decimal.NewFromInt(1)).Mul(decimal.NewFromFloat(price)).Truncate(5)
+			initSellPrice[i+1] = initRadios[i+1].Add(decimal.NewFromInt(1)).Mul(decimal.NewFromFloat(price)).Truncate(pricePrecision)
 		}
 	}
 
@@ -342,7 +344,7 @@ func placeSells() (bool, int, int) {
 		//当价格小于此值时自动暂停
 		if price < minAllowPrice {
 			initSellOrders(true)
-			message.SendDingTalkRobit(true, robot, "doge2_every_autostop_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/(60*60*12)), fmt.Sprintf("当前价格%v小于%v，不挂单。", price, minAllowPrice))
+			message.SendDingTalkRobit(true, robot, "fil2_every_autostop_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/(60*60*12)), fmt.Sprintf("当前价格%v小于%v，不挂单。", price, minAllowPrice))
 			return false, -1, -1
 		}
 	}
@@ -413,14 +415,14 @@ func placeSells() (bool, int, int) {
 
 		//卖单已全部成交，买单还在进行中
 		if openSells == 0 {
-			message.SendDingTalkRobit(true, robot, "doge2_every_allsell_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/(3600*8)), "卖单已全部成交，买单还在进行中")
+			message.SendDingTalkRobit(true, robot, "fil2_every_allsell_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/(3600*8)), "卖单已全部成交，买单还在进行中")
 		}
 	}
 
 	//超时没有成交了
 	var timeout = (time.Now().Unix() - placeSellLastTime) / (3600 * 8)
 	if placeSellLastTime > 0 && timeout > 1 {
-		message.SendDingTalkRobit(true, robot, "doge2_every_sell_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/(3600*8)), fmt.Sprintf("超过%v小时没有新卖单", timeout*8))
+		message.SendDingTalkRobit(true, robot, "fil2_every_sell_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/(3600*8)), fmt.Sprintf("超过%v小时没有新卖单", timeout*8))
 	}
 	return haveNewSell, openSells, openBuys
 }
@@ -458,7 +460,7 @@ func placeBuy(haveNewSell bool, openSells, openBuys int) {
 		}
 	}
 
-	runInitialUSDT, runInitialFIL, _ := RunGetDogeCost(robot, symbol)
+	runInitialUSDT, runInitialFIL, _ := RunGetFilCost(robot, symbol)
 	log.Logger.Debugf("[placeBuy] Initial balances: %s FIL, %s FDUSD", runInitialFIL.String(), runInitialUSDT.String())
 
 	currentFIL, currentUSDT, _, err := getBalances()
@@ -468,10 +470,10 @@ func placeBuy(haveNewSell bool, openSells, openBuys int) {
 	}
 	log.Logger.Debugf("[placeBuy] current balances: %s FIL, %s FDUSD", currentFIL.String(), currentUSDT.String())
 
-	//计算卖掉的doge和获得的usdt
-	var calcDelta = func(dogeDeltaOld float64, usdtBalance decimal.Decimal, initialUSDT decimal.Decimal) (float64, float64) {
+	//计算卖掉的fil和获得的usdt
+	var calcDelta = func(filDeltaOld float64, usdtBalance decimal.Decimal, initialUSDT decimal.Decimal) (float64, float64) {
 		////还没有卖出或没有挂单
-		//if dogeDeltaOld >= 0 {
+		//if filDeltaOld >= 0 {
 		//	return 0, 0
 		//}
 
@@ -489,27 +491,27 @@ func placeBuy(haveNewSell bool, openSells, openBuys int) {
 		}
 
 		var totalUSDT decimal.Decimal
-		var totalDoge decimal.Decimal
+		var totalFil decimal.Decimal
 		//已成交
 		for i, sellPrice := range initSellPrice {
 			if buyOrderId > 0 && minSellPrice.Cmp(decimal.Zero) == 0 { //全卖掉了
 				totalUSDT = totalUSDT.Add(sellPrice.Mul(initSellQty[i]))
-				totalDoge = totalDoge.Add(initSellQty[i])
+				totalFil = totalFil.Add(initSellQty[i])
 			} else if minSellPrice.Cmp(decimal.Zero) > 0 && sellPrice.Cmp(minSellPrice) < 0 {
 				totalUSDT = totalUSDT.Add(sellPrice.Mul(initSellQty[i]))
-				totalDoge = totalDoge.Add(initSellQty[i])
+				totalFil = totalFil.Add(initSellQty[i])
 			}
 		}
 		//部分成交
 		for _, order := range openOrders {
 			if order.Side == binance.SideTypeSell && order.Status == binance.OrderStatusTypePartiallyFilled {
 				usdt1, _ := decimal.NewFromString(order.CummulativeQuoteQuantity)
-				doge1, _ := decimal.NewFromString(order.ExecutedQuantity)
+				fil1, _ := decimal.NewFromString(order.ExecutedQuantity)
 				totalUSDT = totalUSDT.Add(usdt1)
-				totalDoge = totalDoge.Add(doge1)
+				totalFil = totalFil.Add(fil1)
 			}
 		}
-		log.Logger.Debugf("[placeBuy] calcSell: %s FIL, %s FDUSD, minSellPrice: %v", totalDoge.String(), totalUSDT.String(), minSellPrice)
+		log.Logger.Debugf("[placeBuy] calcSell: %s FIL, %s FDUSD, minSellPrice: %v", totalFil.String(), totalUSDT.String(), minSellPrice)
 
 		//if partiallyFilled == true {
 		//	var curUsdt, _ = usdtBalance.Float64()
@@ -518,55 +520,55 @@ func placeBuy(haveNewSell bool, openSells, openBuys int) {
 		//} else {
 		//两者取小
 		if totalUSDT.Cmp(usdtBalance) > 0 {
-			tDoge, _ := totalDoge.Float64()
+			tFil, _ := totalFil.Float64()
 			tUsdt, _ := usdtBalance.Float64()
-			return -tDoge, tUsdt
+			return -tFil, tUsdt
 		} else {
-			tDoge, _ := totalDoge.Float64()
+			tFil, _ := totalFil.Float64()
 			tUsdt, _ := totalUSDT.Float64()
 			////todo 调整参数后需要先用余额计算方式
 			//tUsdt, _ = usdtBalance.Float64()
-			return -tDoge, tUsdt
+			return -tFil, tUsdt
 		}
 	}
 
-	dogeDelta, _ := currentFIL.Sub(runInitialFIL).Float64()
+	filDelta, _ := currentFIL.Sub(runInitialFIL).Float64()
 	//usdtDelta, _ := currentUSDT.Sub(runInitialUSDT).Float64()
-	dogeDeltaNew, usdtDelta := calcDelta(dogeDelta, currentUSDT, runInitialUSDT)
-	if dogeDeltaNew != dogeDelta {
-		message.SendDingTalkRobit(true, robot, "doge2_every_checkdoge_"+symbol,
+	filDeltaNew, usdtDelta := calcDelta(filDelta, currentUSDT, runInitialUSDT)
+	if filDeltaNew != filDelta {
+		message.SendDingTalkRobit(true, robot, "fil2_every_checkfil_"+symbol,
 			fmt.Sprintf("%v", time.Now().Unix()/(8*60*60)),
-			fmt.Sprintf("两种计算结束不一致(dogeDelta: %v,dogeDeltaNew: %v)", dogeDelta, dogeDeltaNew))
+			fmt.Sprintf("两种计算结束不一致(filDelta: %v,filDeltaNew: %v)", filDelta, filDeltaNew))
 	}
-	log.Logger.Debugf("[placeBuy] dogeDelta:%v, dogeDeltaNew: %v, usdtDelta: %v buyOrderId: %v", dogeDelta, dogeDeltaNew, usdtDelta, buyOrderId)
+	log.Logger.Debugf("[placeBuy] filDelta:%v, filDeltaNew: %v, usdtDelta: %v buyOrderId: %v", filDelta, filDeltaNew, usdtDelta, buyOrderId)
 
-	//doge为负，表示已有卖单成交，开始挂买单
-	if dogeDelta < 0 {
+	//fil为负，表示已有卖单成交，开始挂买单
+	if filDelta < 0 {
 		if usdtDelta <= 0 {
 			logmsg := "异常:套利还未执行完，U的余额增量居然小于等于0"
-			message.SendDingTalkRobit(true, robot, "doge2_every_profit_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/(10*60)), logmsg)
+			message.SendDingTalkRobit(true, robot, "fil2_every_profit_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/(10*60)), logmsg)
 			return
 		}
 
-		var tmpReturnProfitDoge int64
-		//可能一直上涨没有大的回调，这时需要把之前的收益拿出来，减少本次的买回量(doge),确保可以成交（收益回撤了）
-		_, firstInitialFIL, _ := RunGetDogeCost(robot, symbol+"-INIT")
-		totalProfitDoge, _ := runInitialFIL.Sub(firstInitialFIL).Float64()
+		var tmpReturnProfitFil int64
+		//可能一直上涨没有大的回调，这时需要把之前的收益拿出来，减少本次的买回量(fil),确保可以成交（收益回撤了）
+		_, firstInitialFIL, _ := RunGetFilCost(robot, symbol+"-INIT")
+		totalProfitFil, _ := runInitialFIL.Sub(firstInitialFIL).Float64()
 		if buySuccLastTime > 0 && time.Now().Unix()-buySuccLastTime > 24*3600 {
-			tmpReturnProfitDoge = int64(totalProfitDoge / 3)
-			dogeDelta = dogeDelta + float64(tmpReturnProfitDoge)
+			tmpReturnProfitFil = int64(totalProfitFil / 3)
+			filDelta = filDelta + float64(tmpReturnProfitFil)
 		} else if buySuccLastTime > 0 && time.Now().Unix()-buySuccLastTime > 20*3600 {
-			tmpReturnProfitDoge = int64(totalProfitDoge / 5)
-			dogeDelta = dogeDelta + float64(tmpReturnProfitDoge)
+			tmpReturnProfitFil = int64(totalProfitFil / 5)
+			filDelta = filDelta + float64(tmpReturnProfitFil)
 		} else if buySuccLastTime > 0 && time.Now().Unix()-buySuccLastTime > 12*3600 {
-			tmpReturnProfitDoge = int64(totalProfitDoge / 10)
-			dogeDelta = dogeDelta + float64(tmpReturnProfitDoge)
+			tmpReturnProfitFil = int64(totalProfitFil / 10)
+			filDelta = filDelta + float64(tmpReturnProfitFil)
 		}
 
 		//要买回的币
-		dogeToBuyBack := decimal.NewFromFloat((0-dogeDelta)*(1+profitFactor)).DivRound(decimal.NewFromInt(1), 0)
+		filToBuyBack := decimal.NewFromFloat((0-filDelta)*(1+profitFactor)).DivRound(decimal.NewFromInt(1), qtyPrecision)
 		//购买价
-		newBuyPrice := decimal.NewFromFloat(usdtDelta).Div(dogeToBuyBack).Truncate(5)
+		newBuyPrice := decimal.NewFromFloat(usdtDelta).Div(filToBuyBack).Truncate(pricePrecision)
 
 		curPrice, err := getCurrentPrice()
 		if err != nil {
@@ -575,7 +577,7 @@ func placeBuy(haveNewSell bool, openSells, openBuys int) {
 		}
 		//新购买价高于当前价
 		if newBuyPrice.Cmp(decimal.NewFromFloat(curPrice)) > 0 {
-			newBuyPrice = decimal.NewFromFloat(curPrice).Mul(decimal.NewFromFloat(1 - 0.0005)).Truncate(5)
+			newBuyPrice = decimal.NewFromFloat(curPrice).Mul(decimal.NewFromFloat(1 - 0.0005)).Truncate(pricePrecision)
 		}
 
 		//取消买单
@@ -585,17 +587,17 @@ func placeBuy(haveNewSell bool, openSells, openBuys int) {
 		}
 
 		//计算新买价和数量
-		var needUsdt = dogeToBuyBack.Mul(newBuyPrice)
+		var needUsdt = filToBuyBack.Mul(newBuyPrice)
 		var needDownRatio = decimal.NewFromFloat(curPrice).Sub(newBuyPrice).Div(decimal.NewFromFloat(curPrice)).Truncate(4).Mul(decimal.NewFromFloat(100)).String() + "%"
-		log.Logger.Debugf("[placeBuy] dogeToBuyBack: %v, newBuyPrice: %v curPrice: %v(needDownRatio:%v) (needUsdt: %v, usdtBalance: %v)", dogeToBuyBack, newBuyPrice, curPrice, needDownRatio, needUsdt, currentUSDT)
+		log.Logger.Debugf("[placeBuy] filToBuyBack: %v, newBuyPrice: %v curPrice: %v(needDownRatio:%v) (needUsdt: %v, usdtBalance: %v)", filToBuyBack, newBuyPrice, curPrice, needDownRatio, needUsdt, currentUSDT)
 
-		orderId, err := placeOrder("BUY", dogeToBuyBack.String(), newBuyPrice.String())
+		orderId, err := placeOrder("BUY", filToBuyBack.String(), newBuyPrice.String())
 		if err != nil {
 			log.Logger.Error("[placeBuy] Error placeOrder:", err)
-			message.SendDingTalkRobit(true, robot, "doge2_every_buy_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/(4*60*60)), err.Error())
+			message.SendDingTalkRobit(true, robot, "fil2_every_buy_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/(4*60*60)), err.Error())
 		} else {
 			buyOrderId = orderId
-			returnProfitDoge = tmpReturnProfitDoge
+			returnProfitFil = tmpReturnProfitFil
 			RunSetInt64(robot, symbol, Filed_BuyOrderId, buyOrderId)
 			placeBuyLastTime = time.Now().Unix()
 		}
@@ -607,7 +609,7 @@ func checkStopByBalance(currentUSDT, currentFIL string, stopBalance decimal.Deci
 	if stopByBalance == false && stopBalance.Cmp(decimal.NewFromFloat(0)) == 0 {
 		//确认是否结束
 		if buyOrderId > 0 {
-			message.SendDingTalkRobit(true, robot, "doge2_every_stop1_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/(3600*8)), "待本轮结束后暂停...")
+			message.SendDingTalkRobit(true, robot, "fil2_every_stop1_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/(3600*8)), "待本轮结束后暂停...")
 			orderstatus, _, err := getOrderStatus(symbol, buyOrderId)
 			if err != nil {
 				log.Logger.Errorf("[checkStopByBalance] getOrderStatus %v %v", buyOrderId, err)
@@ -632,11 +634,11 @@ func checkStopByBalance(currentUSDT, currentFIL string, stopBalance decimal.Deci
 			cancelOrders(binance.SideTypeSell, symbol, openOrders)
 			break
 		}
-		message.SendDingTalkRobit(true, robot, "doge2_every_stop2_"+symbol, fmt.Sprintf("%v", time.Now().Unix()), "已暂停")
+		message.SendDingTalkRobit(true, robot, "fil2_every_stop2_"+symbol, fmt.Sprintf("%v", time.Now().Unix()), "已暂停")
 	}
 
 	if stopByBalance == true && stopBalance.Cmp(decimal.NewFromFloat(0)) != 0 {
-		RunSetDogeCost(robot, symbol, currentUSDT, currentFIL)
+		RunSetFilCost(robot, symbol, currentUSDT, currentFIL)
 		for {
 			//取消可能存在的未成交卖挂单
 			openOrders, err := openOrders()
@@ -657,24 +659,24 @@ func checkStopByBalance(currentUSDT, currentFIL string, stopBalance decimal.Deci
 
 		stopByBalance = false
 
-		message.SendDingTalkRobit(true, robot, "doge2_every_start_"+symbol, fmt.Sprintf("%v", time.Now().Unix()), "已恢复")
+		message.SendDingTalkRobit(true, robot, "fil2_every_start_"+symbol, fmt.Sprintf("%v", time.Now().Unix()), "已恢复")
 	}
 }
 
-func dogeBalanceSaveFile(initTime int64, currentUSDT, currentFIL string) {
+func filBalanceSaveFile(initTime int64, currentUSDT, currentFIL string) {
 	//保存当前余额
 	log.Logger.Debugf("[checkFinish] Initial balances: %s FIL, %s FDUSD", currentFIL, currentUSDT)
-	RunSetDogeCost(robot, symbol, currentUSDT, currentFIL)
+	RunSetFilCost(robot, symbol, currentUSDT, currentFIL)
 
 	//每24小时结算一次：重置初始投入值，在回撤计算时最多回撤24小时收益
 	if (time.Now().Unix()-initTime)/(24*3600) >= 1 {
-		RunSetDogeCost(robot, symbol+"-INIT", currentUSDT, currentFIL)
+		RunSetFilCost(robot, symbol+"-INIT", currentUSDT, currentFIL)
 	}
 }
 
 // 每天余额保存到redis,后面做邮件报表使用
-func dogeBalanceSaveRedis(currentFIL string) {
+func filBalanceSaveRedis(currentFIL string) {
 	var redis = redis2.NewRedisCli("localhost:6379", "", 0)
-	var key = fmt.Sprintf("%v-dogedown-%v", robot, time.Now().Format("2006-01-02"))
+	var key = fmt.Sprintf("%v-fildown-%v", robot, time.Now().Format("2006-01-02"))
 	redis.SetEX(key, currentFIL, 60*24*3600*time.Second)
 }

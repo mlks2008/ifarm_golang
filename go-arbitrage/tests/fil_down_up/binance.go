@@ -107,12 +107,12 @@ func getBalances() (decimal.Decimal, decimal.Decimal, decimal.Decimal, error) {
 		log.Logger.Error(err)
 		return decimal.Zero, decimal.Zero, decimal.Zero, err
 	}
-	var dogeBalance, fdusdBalance, stopBalance decimal.Decimal
+	var filBalance, fdusdBalance, stopBalance decimal.Decimal
 	for _, b := range balances.Balances {
 		if b.Asset == "FIL" {
 			b1, _ := decimal.NewFromString(b.Free)
 			b2, _ := decimal.NewFromString(b.Locked)
-			dogeBalance = b1.Add(b2)
+			filBalance = b1.Add(b2)
 		} else if b.Asset == "FDUSD" {
 			b1, _ := decimal.NewFromString(b.Free)
 			b2, _ := decimal.NewFromString(b.Locked)
@@ -123,12 +123,12 @@ func getBalances() (decimal.Decimal, decimal.Decimal, decimal.Decimal, error) {
 			stopBalance = b1.Add(b2)
 		}
 	}
-	return dogeBalance, fdusdBalance, stopBalance, nil
+	return filBalance, fdusdBalance, stopBalance, nil
 }
 
 // ------------------------------------------ files -------------------------------------------------
 
-func RunGetDogeCost(robot, symbol string) (decimal.Decimal, decimal.Decimal, int64) {
+func RunGetFilCost(robot, symbol string) (decimal.Decimal, decimal.Decimal, int64) {
 	cost := utils.ReadFile(fmt.Sprintf("files/down2_dcaservice.%v.%v.cost", robot, symbol))
 	cost = strings.Replace(cost, "\n", "", -1)
 	if cost == "" {
@@ -136,7 +136,7 @@ func RunGetDogeCost(robot, symbol string) (decimal.Decimal, decimal.Decimal, int
 		if err != nil {
 			panic(err)
 		}
-		RunSetDogeCost(robot, symbol, currentUSDT.String(), currentFIL.String())
+		RunSetFilCost(robot, symbol, currentUSDT.String(), currentFIL.String())
 		return currentUSDT, currentFIL, time.Now().Unix()
 	} else {
 		v := strings.Split(cost, ",")
@@ -147,7 +147,7 @@ func RunGetDogeCost(robot, symbol string) (decimal.Decimal, decimal.Decimal, int
 	}
 }
 
-func RunSetDogeCost(robot, symbol string, usdtbalance string, btcbalance string) {
+func RunSetFilCost(robot, symbol string, usdtbalance string, btcbalance string) {
 	utils.UpdateFile(fmt.Sprintf("files/down2_dcaservice.%v.%v.cost", robot, symbol), usdtbalance+","+btcbalance+","+fmt.Sprintf("%v", time.Now().Unix()))
 }
 
