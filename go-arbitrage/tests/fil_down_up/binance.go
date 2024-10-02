@@ -109,7 +109,7 @@ func getBalances() (decimal.Decimal, decimal.Decimal, decimal.Decimal, error) {
 	}
 	var dogeBalance, fdusdBalance, stopBalance decimal.Decimal
 	for _, b := range balances.Balances {
-		if b.Asset == "DOGE" {
+		if b.Asset == "FIL" {
 			b1, _ := decimal.NewFromString(b.Free)
 			b2, _ := decimal.NewFromString(b.Locked)
 			dogeBalance = b1.Add(b2)
@@ -132,12 +132,12 @@ func RunGetDogeCost(robot, symbol string) (decimal.Decimal, decimal.Decimal, int
 	cost := utils.ReadFile(fmt.Sprintf("files/down2_dcaservice.%v.%v.cost", robot, symbol))
 	cost = strings.Replace(cost, "\n", "", -1)
 	if cost == "" {
-		currentDOGE, currentUSDT, _, err := getBalances()
+		currentFIL, currentUSDT, _, err := getBalances()
 		if err != nil {
 			panic(err)
 		}
-		RunSetDogeCost(robot, symbol, currentUSDT.String(), currentDOGE.String())
-		return currentUSDT, currentDOGE, time.Now().Unix()
+		RunSetDogeCost(robot, symbol, currentUSDT.String(), currentFIL.String())
+		return currentUSDT, currentFIL, time.Now().Unix()
 	} else {
 		v := strings.Split(cost, ",")
 		costQuote, _ := decimal.NewFromString(v[0])

@@ -8,7 +8,7 @@ export GOROOT=/usr/local/go
 go mod tidy
 go build -ldflags "-X 'main.gitHash=$(git show -s --format=%H)'" -o doge
 
-COPYFILE_DISABLE=1 tar --no-xattrs -zcvf doge.bin mainapi-restart.sh mainapi-stop.sh oneplat-restart.sh oneplat-stop.sh doge
+COPYFILE_DISABLE=1 tar --no-xattrs -zcvf doge.bin doge-mainapi-restart.sh doge-mainapi-stop.sh doge-oneplat-restart.sh doge-oneplat-stop.sh doge
 rm -rf doge
 
 echo "上传执行程序..."
