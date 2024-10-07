@@ -5,7 +5,6 @@ import (
 	"components/log/log"
 	"components/message"
 	"components/myconfig"
-	"context"
 	"flag"
 	"fmt"
 	"github.com/shopspring/decimal"
@@ -19,8 +18,8 @@ import (
 var (
 	qtyPrecision       int32 = 2
 	pricePrecision     int32 = 3
-	symbol                   = "FILFDUSD"
-	firstQty                 = 100.0 //首笔挂单量
+	symbol                   = "FILUSDT"
+	firstQty                 = 70.0  //首笔挂单量
 	firstPriceIncrease       = 1.004 //首笔价格增长比例
 
 	baseQty      = 39.0 //Safety order size
@@ -144,19 +143,19 @@ func main() {
 }
 
 func checkFee() bool {
-	fees, err := client.NewTradeFeeService().Symbol(symbol).Do(context.Background())
-	if err != nil {
-		log.Logger.Errorf("NewTradeFeeService %v", err)
-		time.Sleep(time.Minute)
-		return false
-	}
-	makerfee, err := decimal.NewFromString(fees[0].MakerCommission) //挂单
-	if makerfee.Cmp(decimal.Zero) > 0 {
-		log.Logger.Errorf("makerfee:%v >0 ", fees[0].MakerCommission)
-		message.SendDingTalkRobit(true, robot, "fil2_every_fee_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/3600), "makerfee:%v >0")
-		time.Sleep(time.Minute)
-		return false
-	}
+	//fees, err := client.NewTradeFeeService().Symbol(symbol).Do(context.Background())
+	//if err != nil {
+	//	log.Logger.Errorf("NewTradeFeeService %v", err)
+	//	time.Sleep(time.Minute)
+	//	return false
+	//}
+	//makerfee, err := decimal.NewFromString(fees[0].MakerCommission) //挂单
+	//if makerfee.Cmp(decimal.Zero) > 0 {
+	//	log.Logger.Errorf("makerfee:%v >0 ", fees[0].MakerCommission)
+	//	message.SendDingTalkRobit(true, robot, "fil2_every_fee_"+symbol, fmt.Sprintf("%v", time.Now().Unix()/3600), "makerfee:%v >0")
+	//	time.Sleep(time.Minute)
+	//	return false
+	//}
 	return true
 }
 

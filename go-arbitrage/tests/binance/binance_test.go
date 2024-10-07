@@ -45,9 +45,9 @@ func Test_order(t *testing.T) {
 
 func Test_sell(t *testing.T) {
 	var sidetype = binance.SideTypeSell
-	var symbol = "DOGEFDUSD"
-	var quantity = "19169"
-	var price = "0.1265"
+	var symbol = "FILFDUSD"
+	var quantity = "4957"
+	var price = "4.159"
 
 	client := getClient("oneplat")
 	order, err := client.NewCreateOrderService().Type(binance.OrderTypeLimit).TimeInForce(binance.TimeInForceTypeGTC).

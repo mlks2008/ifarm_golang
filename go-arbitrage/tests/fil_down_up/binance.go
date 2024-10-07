@@ -113,7 +113,7 @@ func getBalances() (decimal.Decimal, decimal.Decimal, decimal.Decimal, error) {
 			b1, _ := decimal.NewFromString(b.Free)
 			b2, _ := decimal.NewFromString(b.Locked)
 			filBalance = b1.Add(b2)
-		} else if b.Asset == "FDUSD" {
+		} else if b.Asset == "USDT" {
 			b1, _ := decimal.NewFromString(b.Free)
 			b2, _ := decimal.NewFromString(b.Locked)
 			fdusdBalance = b1.Add(b2)
