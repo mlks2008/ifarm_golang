@@ -239,7 +239,7 @@ func checkFinish() {
 				continue
 			}
 			//本轮长时间没成交
-			if buyOrderId == 0 && placeSellLastTime > 0 && time.Now().Unix()-placeSellLastTime > 10*60 {
+			if buyOrderId == 0 && placeSellLastTime > 0 && time.Now().Unix()-placeSellLastTime > 6*60 {
 				curPrice, err := getCurrentPrice()
 				if err != nil {
 					log.Logger.Error("[placeSells] Error getCurrentPrice:", err)
