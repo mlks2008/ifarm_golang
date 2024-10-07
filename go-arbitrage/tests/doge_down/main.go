@@ -452,9 +452,13 @@ func placeBuy(haveNewSell bool, openSells, openBuys int) {
 	}
 
 	//如果买单已经是部分成交，不在进行重挂
+	var buyOrder *binance.Order
 	for _, order := range openOrders {
 		if order.OrderID == buyOrderId && order.Status == binance.OrderStatusTypePartiallyFilled {
 			return
+		}
+		if order.OrderID == buyOrderId {
+			buyOrder = order
 		}
 	}
 
@@ -576,16 +580,32 @@ func placeBuy(haveNewSell bool, openSells, openBuys int) {
 			newBuyPrice = decimal.NewFromFloat(curPrice).Mul(decimal.NewFromFloat(1 - 0.0005)).Truncate(5)
 		}
 
+		//新买单价格和数量未变，不需要重新下单
+		{
+			if buyOrder != nil {
+				orderQty, _ := decimal.NewFromString(buyOrder.OrigQuantity)
+				orderPrice, _ := decimal.NewFromString(buyOrder.Price)
+				newQty := dogeToBuyBack
+				newPrice := newBuyPrice
+				if orderQty.Cmp(newQty) == 0 && orderPrice.Cmp(newPrice) == 0 {
+					//log.Logger.Debugf("[placeBuy] 买单价格和数量不变化,不需要重新下单")
+					return
+				}
+			}
+		}
+
 		//取消买单
 		if buyOrderId > 0 {
 			cancelOrder(buyOrderId)
 			time.Sleep(time.Millisecond * 500)
 		}
 
-		//计算新买价和数量
-		var needUsdt = dogeToBuyBack.Mul(newBuyPrice)
-		var needDownRatio = decimal.NewFromFloat(curPrice).Sub(newBuyPrice).Div(decimal.NewFromFloat(curPrice)).Truncate(4).Mul(decimal.NewFromFloat(100)).String() + "%"
-		log.Logger.Debugf("[placeBuy] dogeToBuyBack: %v, newBuyPrice: %v curPrice: %v(needDownRatio:%v) (needUsdt: %v, usdtBalance: %v)", dogeToBuyBack, newBuyPrice, curPrice, needDownRatio, needUsdt, currentUSDT)
+		//log
+		{
+			var needUsdt = dogeToBuyBack.Mul(newBuyPrice)
+			var needDownRatio = decimal.NewFromFloat(curPrice).Sub(newBuyPrice).Div(decimal.NewFromFloat(curPrice)).Truncate(4).Mul(decimal.NewFromFloat(100)).String() + "%"
+			log.Logger.Debugf("[placeBuy] dogeToBuyBack: %v, newBuyPrice: %v curPrice: %v(needDownRatio:%v) (needUsdt: %v, usdtBalance: %v)", dogeToBuyBack, newBuyPrice, curPrice, needDownRatio, needUsdt, currentUSDT)
+		}
 
 		orderId, err := placeOrder("BUY", dogeToBuyBack.String(), newBuyPrice.String())
 		if err != nil {
