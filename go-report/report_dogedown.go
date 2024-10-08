@@ -7,23 +7,28 @@ import (
 	"components/myconfig"
 	"fmt"
 	"github.com/shopspring/decimal"
+	"strings"
 	"time"
 )
 
+func reportFilDown_oneplat() {
+	reportDown1("oneplat", "fil")
+}
+
 func reportDogeDown_oneplat() {
-	reportDogeDown1("oneplat")
+	reportDown1("oneplat", "doge")
 }
 
 func reportDogeDown_mainapi() {
-	reportDogeDown1("mainapi")
+	reportDown1("mainapi", "doge")
 }
 
-func reportDogeDown1(robot string) {
+func reportDown1(robot string, coin string) {
 	var getTr = func(lastDate time.Time, date time.Time, count int, totalEarn decimal.Decimal) (string, decimal.Decimal) {
 		var redis = redis2.NewRedisCli(myconfig.GConfig.Redis.Host, myconfig.GConfig.Redis.Password, myconfig.GConfig.Redis.DB)
 
 		//当天余额
-		key := fmt.Sprintf("%v-dogedown-%v", robot, date.Format("2006-01-02"))
+		key := fmt.Sprintf("%v-%vdown-%v", robot, coin, date.Format("2006-01-02"))
 		bal, err := redis.GetDecimal(key)
 		if err != nil {
 			logmsg := fmt.Sprintf("redis.GetDecimal:%v", err.Error())
@@ -35,7 +40,7 @@ func reportDogeDown1(robot string) {
 		var lastBal decimal.Decimal
 		if bal != decimal.Zero {
 			for {
-				lastKey := fmt.Sprintf("%v-dogedown-%v", robot, lastDate.Format("2006-01-02"))
+				lastKey := fmt.Sprintf("%v-%vdown-%v", robot, coin, lastDate.Format("2006-01-02"))
 				lastBal, err = redis.GetDecimal(lastKey)
 				if err != nil {
 					logmsg := fmt.Sprintf("redis.GetDecimal:%v", err.Error())
@@ -101,7 +106,7 @@ func reportDogeDown1(robot string) {
 	location, _ := time.LoadLocation("Asia/Shanghai")
 	t := time.Unix(time.Now().Unix(), 0).In(location)
 	var nowDate = t.Format("2006-01-02 15:04:05")
-	var table = fmt.Sprintf(`<div style='text-align: left'><h3>Doge每日收益报表 %v</h3><h4>日收益：当天余额-前日余额</h4></div>
+	var table = fmt.Sprintf(`<div style='text-align: left'><h3>%v每日收益报表 %v</h3><h4>日收益：当天余额-前日余额</h4></div>
 	       <table>
 	       <thead>
 	       <tr class='bgcolor0'>
@@ -111,7 +116,7 @@ func reportDogeDown1(robot string) {
 	           	<th class='padding'>帐户余额 $</th>
 	       </tr>
 	       </thead>
-	       <tbody>%v</tbody></table>`, nowDate, trs)
+	       <tbody>%v</tbody></table>`, strings.ToUpper(coin), nowDate, trs)
 
 	//发送邮件
 	var emailHtml = fmt.Sprintf(`<style>
@@ -123,12 +128,12 @@ func reportDogeDown1(robot string) {
 	   .reason{text-align: left;}
 	   </style>
 		%v`, table)
-	var subject = fmt.Sprintf(`%v - Farm Doge Daily Report %v`, robot, nowDate)
+	var subject = fmt.Sprintf(`%v - Farm %v Daily Report %v`, robot, strings.ToUpper(coin), nowDate)
 	var err = new(EmailHelper).SendEmail(subject, emailHtml)
 	if err != nil {
 		log.Logger.Error("SendEmail", err)
 		logmsg := fmt.Sprintf("SendEmail:%v", err.Error())
 		message.SendDingTalkRobit(true, myconfig.GConfig.Project, "SendEmail", fmt.Sprintf("%v", time.Now().Unix()/(60*60*24)), logmsg)
 	}
-	log.Logger.Debug("reportDogeDown ok")
+	log.Logger.Debug("report ok")
 }
